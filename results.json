@@ -145,7 +145,7 @@
   "detail": ""
  },
  {
-  "name": "P2-07 Dialog links: apply/evidence only for non-DEMO listings that have them; external links use rel=noopener; no 'submitted' claims",
+  "name": "P2-07 Details links: evidence link only for VERIFIED listings; apply URL hidden until review step; rel=noopener; no 'submitted' claims",
   "status": "PASS",
   "detail": ""
  },
@@ -236,6 +236,151 @@
  },
  {
   "name": "P2-24 Page still runs with no JS errors when optional elements are missing (15 variants)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-01 Shipped DEMO listing: details show its own data, DEMO badge, fictional notice, no links",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-02 DEMO Apply Now: explains it is sample data, stays on NEXORA, no new tab, no record, no 'submitted' claim, Back works",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-03 Every shipped job opens its own, different details",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-04 The selected job is correct after sorting and after filtering",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-05 Closing (X, Close button, backdrop) keeps the search and filters; focus returns to the opener",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-06 Save/unsave from details and cards share one state, persist, and update Saved (N)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-07 Un-saving from details in the Saved-only view: dialog stays correct, list updates, focus lands safely",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-08 No duplicate listeners: after 5 open/close cycles one click toggles exactly once",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-09 Keyboard: focus stays inside the modal, Enter/Space work, Escape closes, scroll lock released, focus restored",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-10 Dialog semantics: labelled by job title, described, named close button, live status, unique ids",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-11 Visible focus ring on dialog X, Apply Now, Save and Close",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-12 No JavaScript errors during shipped-data flows",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-13 Full record shows every known field, multi-paragraph description, optional lists, evidence link; nothing marked missing",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-14 Missing/malformed optional fields: no errors, nothing invented, unavailable fields stated or omitted",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-15 No application URL: Apply Now is aria-disabled with a visible reason, no review, no navigation, no fake link",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-16 DEMO listing that carries an applyUrl still never exposes or opens it",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-17 Valid official URL: review step shows title, company, domain, leaving-NEXORA notice, Continue and Cancel; no form fields; Cancel returns",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-18 UNVERIFIED listings: caution shown before redirect, never described as verified; http and past-deadline warnings",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-19 Unsafe URLs rejected (javascript:, data:, ftp:, //host, embedded credentials, malformed); DEMO never redirects",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-20 Continue opens the exact URL in a new tab with no opener; records only EXTERNAL_REDIRECT_OPENED (never Submitted); nothing persisted; no 'applied' claim",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-21 A double click on Continue opens one tab and records one redirect",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-22 Demo, no-URL and cancelled flows create no application record",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-23 Injected HTML in title, company, skills and description is shown as plain text, never executed",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-24 No JavaScript errors during injected-data flows",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-25 Dialog fits 320-1280 px: no horizontal overflow, inside viewport, tap targets >= 40px (details, review, demo views)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-26 Emulated touch phone: tap View details, Save, Apply, Cancel, Close",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-27 applications.js: refuses nexora/demo/invalid records, unique ids, redirect never 'Submitted', in-memory store",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-28 paragraphs() splits long text safely and tolerates bad input",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "S13-29 applications.js ships with the project",
   "status": "PASS",
   "detail": ""
  }

@@ -1,50 +1,45 @@
 # NEXORA — Progress
 
-## Phase 1, Step 1.2 (Parts 1 and 2) — STATUS: COMPLETE
+## Phase 1, Step 1.3 — Job details and application flow — STATUS: COMPLETE (frontend scope)
 
-### Features implemented across Step 1.2
-**Part 1**
-- Central job data structure with full schema (`data.js`) separated from logic (`jobs.js`) and UI (`main.js`).
-- Search (button + Enter, clear button, no fallback results), filters (type, work mode, location, category, experience) that combine, active chips, Clear all.
-- Sorting: relevance, Title A–Z; newest/pay disabled with an explanation (no data).
-- Accurate result count and empty state with Edit search / Clear all filters.
-- Popular chips and category cards run real searches; nav links reset/set filters.
+### Features implemented
+- **Job-details view** built into the existing dialog, populated by the selected job's unique id from the central data: company mark, status badge (DEMO / UNVERIFIED / VERIFIED by real evidence), type, work mode, location, employment type, experience, compensation, posting date, deadline, skills, multi-paragraph description, responsibilities / qualifications / benefits (only when data exists), a "Not provided for this listing" line, evidence link for VERIFIED listings. Everything inserted as text; unknown values are omitted or stated as not provided.
+- **Dialog behaviour**: X, Close, Escape and backdrop close it; focus contained inside and background inert; page scroll locked while open; focus restored to the opening card (or Saved button if the card is gone); labelled by job title; live status region.
+- **Apply Now**: DEMO shows an honest "sample data, cannot accept an application" view and stays on NEXORA; no usable URL gives an unavailable button with a visible reason; a safe official URL gives a **review step** (job, company, domain, leaving-NEXORA notice, caution for unverified, `http` warning, passed-deadline note) then **Continue to application** opens the URL in a new tab with `noopener noreferrer`.
+- **URL safety**: only `http(s)` with a real host and no embedded credentials; `javascript:`, `data:`, `ftp:`, `//host`, malformed values rejected; DEMO never redirects even if it carries a URL; second click within 1.5 s ignored.
+- **Application-record foundation** (`applications.js`): record shape, `external_redirect` vs reserved `nexora` method, statuses `EXTERNAL_REDIRECT_OPENED` / `SUBMITTED`, in-memory store with a swappable adapter. A redirect is recorded only as `EXTERNAL_REDIRECT_OPENED`, never Submitted; nothing is persisted or displayed.
+- **Save job** inside the dialog shares the bookmark list with the cards (card, dialog, Saved (N) and Saved-only view stay in step).
+- Step 1.2 behaviour preserved; no redesign; no new colours.
 
-**Part 2**
-- Job cards: consistent layout; type, work mode, location always; employment type, experience, compensation, posted date and deadline only when known; skills only when present; "Remote" shown once.
-- Listing status: DEMO / UNVERIFIED / VERIFIED badges that follow real evidence (VERIFIED needs a valid `evidenceUrl`, otherwise shown Unverified). `http(s)`-only URLs.
-- "View details" (existing dialog, enriched): facts, status note, evidence/employer links only for non-DEMO listings with links. No claim that anything was applied for or submitted.
-- Bookmarks: toggle, persistence in `localStorage`, validation of stored data, graceful handling of blocked/full storage (kept for the visit + user told), cross-tab sync, **Saved (N)** count and **Saved only** filter wired to the same single source of truth, empty state when nothing is saved.
-- Accessibility: stable accessible names + `aria-pressed` on bookmark buttons, named View-details buttons, live regions, labelled navs, dialog description, visible focus rings on fields and filters, hidden empty active-filter list. Contrast of all token pairs checked (>= 4.5:1).
-- Robustness: `main.js` no longer throws when optional elements are missing.
-- `tests/regression_test.py` (48 checks), `TEST_REPORT.md`, updated README / PROJECT_CONTEXT / PROGRESS.
-
-### Files changed in Part 2
-`index.html` (icons, Saved toggle, dialog structure, ARIA), `assets/css/components.css` (appended: status badges, focus ring, dialog extras), `assets/js/jobs.js` (added formatting/card-fact/safety helpers; search scoring, facet matching and sorting functions untouched; `validDate` now rejects impossible dates, `normalize` sanitises URLs, `defaultState`/`run`/`activeFilters` gained the saved-only filter), `assets/js/main.js` (reworked in place, same structure and behaviour plus the additions above), docs, new `tests/`. `data.js`, `tokens.css`, `base.css`, `home.css`, `favicon.svg` are unchanged.
+### Files changed
+`index.html` (dialog markup: X button and job container, external-link icon, applications.js script tag), `assets/js/jobs.js` (appended helpers; `normalize` also cleans `description` and the three optional lists; search/filter/sort code untouched), `assets/js/applications.js` (new), `assets/js/main.js` (dialog core refactor, `showDetails` replaced, `toggleSaved(id, quiet)`), `assets/css/components.css` (appended Step 1.3 styles), `assets/css/home.css` (one defensive rule on `.opp`), `assets/js/data.js` (schema comment only; data unchanged), `tests/regression_test.py` (two Step 1.2 checks updated, 29 new checks), docs.
 
 ### Test results
-48 of 48 automated checks PASS in headless Chromium, including all 18 required regression tests. See `TEST_REPORT.md` for the full table, the bugs found and fixed in Part 1 code, and the NOT TESTED list.
+77 of 77 automated checks PASS in headless Chromium: the 48 carried from Step 1.2 (two with updated expectations because the dialog changed, see `TEST_REPORT.md`) plus 29 new Step 1.3 checks. See `TEST_REPORT.md` for the table, how the checks work, bugs found, and the NOT TESTED list.
 
-### Known bugs and limitations
-- Demo data only (6 fictional listings): no salary, dates, descriptions, application URLs or employment sub-types, so there is no salary filter, and newest/pay sorts and Full-time/Part-time/Contract/Freelance/Experienced options are disabled.
-- Pay/date/verified/link rendering has been verified only with temporary test data, not shipped data.
-- Bookmarks are browser-local: not account-based, not synced across devices, lost if site data is cleared or in private browsing.
-- Remote jobs don't match a city location search (by design; "remote" does match).
-- Search matches word starts only ("script" will not find "JavaScript").
-- Filter state (including Saved only) is not in the URL and resets on reload.
-- "View details" is a dialog, not a page.
-- NOT TESTED: real screen readers, Firefox/Safari/Edge, real touch devices, the Google Font itself (sandbox offline), axe/Lighthouse audits, forced-colors mode, 200% zoom, printing.
-- Google Font needs internet.
+### Known issues and limitations
+- All listings are DEMO. Real-URL, verified, pay, date and description rendering was exercised only with temporary test data (and a mocked external site), not with shipped data.
+- No backend: no application submission, tracking, history, recruiter responses, accounts, resume upload or synced bookmarks. Application records exist only in memory for the page visit and are not displayed.
+- "View details" is a dialog with no shareable URL.
+- Search word-start only; remote jobs do not match a city search; filter state resets on reload; bookmarks are browser-local.
+- Chromium prefers one extra native Tab stop (its own UI) after the last control in a modal; focus never reaches page controls.
+- NOT TESTED: real screen readers, Firefox/Safari/Edge, real touch devices and real popup-blocker behaviour, the Google Font, axe/Lighthouse, forced-colors, 200% zoom, printing, Live Server, a real employer website (external pages were mocked in tests).
 
-### Remaining work (later steps)
-Job details page, application flow and application tracking, auth/accounts and synced bookmarks, real opportunity data and verification process, recruiter portal, backend, the pages marked "Soon", legal and contact content.
+### Remaining work (later steps, mostly backend-dependent)
+Accounts and synced bookmarks; real application submission, application history and recruiter status updates; real opportunity data and verification process; recruiter portal; the pages marked "Soon"; legal and contact content.
 
 ### Exact next step
-**Phase 1, Step 1.3 — Job Details and Application Flow.**
+**Phase 1, Step 1.4 — Finalise and validate the complete opportunity-discovery experience before proceeding to the next major phase.**
 
-Handoff notes for Step 1.3:
-- Keep the plain HTML/CSS/JS architecture and the design tokens; do not add colours.
-- `showDetails(o)` in `main.js` is where the dialog is built today. Replace or extend it; `Jobs.cardFacts(o)` supplies the displayable facts and `Jobs.safeUrl` guards links.
-- Preserve status honesty: DEMO listings have nothing to apply to; never display "applied/submitted" unless an application was really recorded; VERIFIED requires `evidenceUrl`.
-- Listing ids are numbers; bookmarks are stored by id under `nexora:demo-saved`. Use the `nexora:` prefix for any new storage key.
-- `tests/regression_test.py` checks P2-03 and P2-07 assume the `#dialog` details; update them if the dialog is replaced. Run the whole suite before and after.
+Handoff notes for Step 1.4:
+- Keep the plain HTML/CSS/JS architecture and design tokens; do not add colours.
+- Run `python3 tests/regression_test.py` first (77 checks should pass), then validate the whole discovery journey end to end (home → search/filter/sort → details → save → apply flow) and decide what, if anything, still blocks moving to the next phase.
+- Preserve status honesty: DEMO listings never open a URL or create a record; a redirect is never "Submitted"; VERIFIED requires `evidenceUrl`.
+- Candidates to review in 1.4: shareable details URLs, filter state in the URL, search matching, real-device and cross-browser checks (listed as NOT TESTED), and an axe/Lighthouse pass if tooling is available.
+
+---
+
+## Earlier steps (summary)
+
+### Phase 1, Step 1.2 (Parts 1 and 2) — COMPLETE
+Central job data; search; combining filters; sorting where supported; result counts and empty states; informative cards; DEMO / UNVERIFIED / VERIFIED status badges; persistent bookmarks with Saved (N) and Saved-only view; accessibility pass; 48 automated checks. Step 1: design system and homepage.

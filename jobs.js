@@ -87,6 +87,12 @@
     return { min: min, max: max, currency: String(s.currency), period: String(s.period) };
   }
 
+  /* Optional list fields (responsibilities, qualifications, benefits): keep only non-empty strings. Missing or malformed => []. */
+  function cleanList(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter(function (v) { return typeof v === "string" && v.trim() !== ""; }).map(function (v) { return v.trim(); });
+  }
+
   /* Make a record safe to use: arrays are arrays, unknown stays null, and a VERIFIED
      status without evidence is downgraded (a verification claim needs proof). */
   function normalize(job) {
@@ -99,7 +105,10 @@
     j.deadline = validDate(job.deadline) !== null ? job.deadline : null;
     j.experience = job.experience || null;
     j.employmentType = job.employmentType || null;
-    j.description = job.description || null;
+    j.description = typeof job.description === "string" && job.description.trim() ? job.description : null;
+    j.responsibilities = cleanList(job.responsibilities);
+    j.qualifications = cleanList(job.qualifications);
+    j.benefits = cleanList(job.benefits);
     j.applyUrl = safeUrl(job.applyUrl);
     j.evidenceUrl = safeUrl(job.evidenceUrl);
     j.status = STATUSES.indexOf(job.status) !== -1 ? job.status : "UNVERIFIED";
@@ -327,11 +336,57 @@
     return out;
   }
 
+
+  /* ---------- details and application destination (Step 1.3) ---------- */
+
+  /* Stricter than safeUrl, used before sending anyone off-site: http(s) only, a real host, and no embedded
+     credentials ("https://user:pass@host" is a common way to disguise a destination). Returns { url, host, secure } or null. */
+  function parseApplyUrl(value) {
+    var ok = safeUrl(value);
+    if (!ok) return null;
+    try {
+      var u = new URL(ok);
+      if (!u.hostname || u.username || u.password) return null;
+      return { url: u.href, host: u.hostname.replace(/^www\./i, ""), secure: u.protocol === "https:" };
+    } catch (err) { return null; }
+  }
+
+  /* What "Apply" may do for a listing. Decided only from real data and status:
+       demo            DEMO listing: never leaves NEXORA, whatever applyUrl says
+       none            no usable official application URL
+       external        UNVERIFIED listing with a safe URL: caution + review step before leaving
+       external-verified   VERIFIED listing with a safe URL: review step before leaving */
+  function applyDestination(job) {
+    if (!job || job.status === "DEMO") return { kind: "demo", url: null, host: null, secure: false };
+    var p = parseApplyUrl(job.applyUrl);
+    if (!p) return { kind: "none", url: null, host: null, secure: false };
+    return { kind: job.status === "VERIFIED" ? "external-verified" : "external", url: p.url, host: p.host, secure: p.secure };
+  }
+
+  /* Details a visitor might expect that this listing does not provide, so the dialog can say so instead of guessing. */
+  function missingFields(job) {
+    var out = [];
+    if (!job.description) out.push("Description");
+    if (!job.salary) out.push("Compensation");
+    if (!job.postedDate) out.push("Posting date");
+    if (!job.deadline) out.push("Application deadline");
+    if (!job.experience) out.push("Experience level");
+    if (!job.skills.length) out.push("Required skills");
+    return out;
+  }
+
+  /* Long descriptions: split on blank lines so they render as readable paragraphs (text only, never HTML). */
+  function paragraphs(text) {
+    if (typeof text !== "string") return [];
+    return text.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+  }
+
   var api = {
     FACETS: FACETS, SORTS: SORTS, normalize: normalize, normalizeAll: normalizeAll, defaultState: defaultState,
     run: run, activeFilters: activeFilters, facetOptions: facetOptions, countFacet: countFacet,
     sortSupport: sortSupport, locations: locations,
-    formatSalary: formatSalary, formatDate: formatDate, isPast: isPast, safeUrl: safeUrl, cardFacts: cardFacts, cleanSavedIds: cleanSavedIds
+    formatSalary: formatSalary, formatDate: formatDate, isPast: isPast, safeUrl: safeUrl, cardFacts: cardFacts, cleanSavedIds: cleanSavedIds,
+    parseApplyUrl: parseApplyUrl, applyDestination: applyDestination, missingFields: missingFields, paragraphs: paragraphs
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.NexoraJobs = api;
 })(typeof window !== "undefined" ? window : this);

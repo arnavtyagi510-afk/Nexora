@@ -1,116 +1,133 @@
-# NEXORA — Test Report (Phase 1, Step 1.2)
+# NEXORA — Test Report (Phase 1, Step 1.3)
 
-Every PASS below comes from a check that was actually executed by `tests/regression_test.py` in headless Chromium (Playwright). The last run executed **48 checks: 48 PASS, 0 FAIL**. Anything not executed is listed under NOT TESTED; it is not claimed.
+Every PASS below comes from a check that was actually executed by `tests/regression_test.py` in headless Chromium (Playwright). The last run executed **77 checks: 77 PASS, 0 FAIL** (48 carried from Step 1.2, two of them with updated expectations, plus 29 new Step 1.3 checks). Anything not executed is listed under NOT TESTED; it is not claimed.
 
 ## Environment
 
-- Headless Chromium 141 via Playwright 1.56 (Python), sandboxed Linux, no internet access.
-- Site opened via `file://` for most checks; a local `python3` HTTP server was used only for tests that substitute `data.js` with test data.
+- Headless Chromium via Playwright 1.56 (Python), sandboxed Linux, no internet access.
+- Site opened via `file://` for shipped-data checks; a local `python3` HTTP server was used for tests that substitute `data.js` with test data.
+- External employer sites were **mocked** (`jobs.example.org`, `careers.example.net`, `example.com` requests are answered by the test with a stub page). No real external website was visited.
 - Viewports: 320, 375, 390 (touch emulation), 414, 768, 1024, 1280 px.
-- Re-run: `python3 tests/regression_test.py` from the project root.
 
-## 1. Required regression tests (18)
+## 1. Step 1.3 checks (29)
 
-| # | Test | Result | What was checked |
+"Shipped data" = the real six DEMO listings. "Test data" = a temporary dataset injected in place of `data.js` for that test only (10 listings: verified with URL, unverified with `http` URL and past deadline, unverified without URL, DEMO carrying a URL, VERIFIED-without-evidence with URL, a malformed record, a `user@host` credential URL, a `data:` URL, a minimal record, and an HTML-injection record). It proves the rules; it does not mean the shipped data contains such values.
+
+| ID | Check | Data | Result |
 |---|---|---|---|
-| 1 | Homepage loads without JavaScript errors | PASS | Page errors and console errors (external Google Font request excluded, see limitations); six cards and a correct count render; no local asset request fails. |
-| 2 | Search by title | PASS | `frontend` → Junior Frontend Developer. |
-| 3 | Search by company | PASS | `quarry` → Data Analyst Intern. |
-| 4 | Search by skill | PASS | `pytorch` → Machine Learning Associate (Entry). |
-| 5 | Search by location | PASS | Location box `Mumbai` and keyword `mumbai` → UI/UX Design Intern. |
-| 6 | Enter submits a search | PASS | Typing `figma` then Enter filters results. |
-| 7 | Clear search restores results | PASS | × button empties the box and restores all 6. |
-| 8 | Each supported filter works | PASS | Every value of Type, Work mode, Category and Experience checked against the expected count. |
-| 9 | Multiple filters combine correctly | PASS | Job+Hybrid=2, Job+Remote=0 (empty state), Internship+Remote+Business=1. |
-| 10 | Clear all filters resets all filter state | PASS | Search, location, all four selects and the hero type select return to defaults; chips disappear. |
-| 11 | Sorting works where supported | PASS | Title A–Z verified; Newest and Compensation correctly disabled (no data). |
-| 12 | Result counts remain accurate | PASS | Count text equals the number of cards for 6 queries, singular/plural and zero. |
-| 13 | Empty state for zero matches | PASS | Appears with Edit search / Clear all filters; Clear all recovers. |
-| 14 | Bookmarks toggle correctly | PASS | On, off, multiple at once. |
-| 15 | Bookmarks persist after refresh | PASS | Add and remove both survive reload. |
-| 16 | Existing navigation remains intact | PASS | Nav links, Internships link, Soon dialogs, category cards, mobile menu (button + Escape). |
-| 17 | Mobile layout does not overflow | PASS | No horizontal overflow at 320/375/414/768/1024/1280 px, also with the empty state; plus emulated touch phone. |
-| 18 | Existing design and required assets intact | PASS | Computed ivory background, forest-green primary button and wordmark, font stack, header/footer/all five sections, favicon link; all 8 asset files present. |
+| S13-01 | DEMO details show that listing's own data, DEMO badge, fictional notice, no links | shipped | PASS |
+| S13-02 | DEMO Apply Now explains sample data, stays on NEXORA (same URL, no new tab), no record, no "submitted" wording; Back works and focus returns to Apply | shipped | PASS |
+| S13-03 | Each of the six shipped jobs opens its own, different details | shipped | PASS |
+| S13-04 | Selected job is correct for every card after Title A–Z sorting and after a work-mode filter | shipped | PASS |
+| S13-05 | Closing by X, Close button and backdrop keeps keyword, filter, count and card list; focus returns to the opening card | shipped | PASS |
+| S13-06 | Save/unsave from details and cards share one state, persist across reload, update Saved (N); localStorage holds `[3]` then `[5]` | shipped | PASS |
+| S13-07 | Un-saving from details in Saved-only view: dialog stays on the right job, list behind updates, focus lands on Saved toggle, no errors | shipped | PASS |
+| S13-08 | After 5 open/close cycles, one click on Save toggles exactly once (no stacked listeners) | shipped | PASS |
+| S13-09 | Keyboard: focus never reaches page controls while open (see note), Enter and Space work, Escape closes, scroll lock released, focus restored; `:modal` is the dialog | shipped | PASS |
+| S13-10 | Semantics: labelled by job title, described, X has a name, status is a live region, no unnamed controls, unique ids | shipped | PASS |
+| S13-11 | Visible focus ring (>= 2px) on X, Apply Now, Save and Close | shipped | PASS |
+| S13-12 | No JavaScript errors across the shipped-data flows | shipped | PASS |
+| S13-13 | Full record shows every known field, multi-paragraph description, responsibilities/qualifications/benefits, evidence link (`noopener`); nothing flagged missing | test | PASS |
+| S13-14 | Missing or malformed optional fields: no errors, no "undefined/null/NaN", no invented sections, unknown fields stated as not provided | test | PASS |
+| S13-15 | No application URL: Apply Now is `aria-disabled`, visible reason, activation shows no review, no navigation | test | PASS |
+| S13-16 | DEMO listing that carries an `applyUrl` never exposes or opens it | test | PASS |
+| S13-17 | Valid URL: review shows title, company, domain, leaving-NEXORA notice, Continue (`<a>` with exact href, `_blank`, `noopener`) and Cancel; no form fields; Cancel returns; no tab opened by merely reviewing | test | PASS |
+| S13-18 | UNVERIFIED listings show a caution before redirect and are never described as verified; `http` and passed-deadline warnings appear where they apply (and not for https/VERIFIED-downgraded case) | test | PASS |
+| S13-19 | Unsafe URLs rejected: `javascript:`, `data:`, `ftp:`, `//host`, `user@host`, `user:pw@host`, leading-space `JAVASCRIPT:`, `https://`; `www.` stripped from the displayed domain; `window.__xss` stays unset | test | PASS |
+| S13-20 | Continue opens the exact URL in a new tab with `window.opener === null`; exactly one record, status `EXTERNAL_REDIRECT_OPENED`, method `external_redirect`, `candidateId` null, host `jobs.example.org`, only the 7 expected keys; no `SUBMITTED`; status text says it is not counted as an application; no "submitted/applied" wording anywhere on the page; nothing persisted beyond the bookmark key | test | PASS |
+| S13-21 | Double click on Continue opens one tab and records one redirect | test | PASS |
+| S13-22 | DEMO, no-URL and cancelled flows create no application record | test | PASS |
+| S13-23 | HTML in title, company, skills and description is shown as plain text, never executed | test | PASS |
+| S13-24 | No JavaScript errors across the injected-data flows | test | PASS |
+| S13-25 | Dialog (details, review and demo views) at 320/375/414/768/1024/1280 px: no dialog or page horizontal overflow, inside the viewport, buttons >= 40px | test | PASS |
+| S13-26 | Emulated touch phone (390px): tap View details, Save, Apply Now, Cancel, X; card bookmark matches | test | PASS |
+| S13-27 | `applications.js`: refuses `nexora`, demo, invalid id, missing host and unknown method; unique ids; redirect records are never "submitted via NEXORA"; store is in-memory | browser | PASS |
+| S13-28 | `paragraphs()` splits on blank lines and tolerates null/number/blank input | browser | PASS |
+| S13-29 | `assets/js/applications.js` ships with the project | files | PASS |
 
-## 2. Additional Part 2 checks
+Notes:
 
-| ID | Check | Result |
+- **S13-09 Tab behaviour:** after the last control in the modal, Chromium adds one native Tab stop for its own browser UI (`document.activeElement` becomes `<body>`). The test accepts that stop and fails if focus ever lands on a page control. The observed cycle was: Apply Now → Save → Close → (browser UI) → X → Apply Now.
+- **S13-20 / S13-21** run against a mocked external site; they prove NEXORA opens the right URL safely and records it correctly, not that any real employer site works.
+
+## 2. Carried-forward checks (48) and the two that changed
+
+All 48 Step 1.2 checks were re-run: 18 core regression tests (homepage, search, filters, sorting, counts, empty state, bookmarks, persistence, navigation, no overflow at six widths, design and assets preserved) and the Part 2 checks (cards, status badges, saved view, storage failures, cross-tab sync, accessibility, optional-element removal, touch). See the Step 1.2 list in `tests/results.json`.
+
+Two Step 1.2 checks assumed the old dialog and were updated because the intended behaviour changed, not to hide a failure:
+
+| Check | Why it had to change |
+|---|---|
+| P2-07 | It expected the apply URL as a direct link in the details view. Step 1.3 deliberately hides it until the review step, so the check now asserts the opposite for the apply URL (hidden) and keeps the evidence-link and `noopener` assertions. |
+| P2-27 | It tapped the old "Got it" button, which does not exist in the job layout; it now taps the X button. |
+
+P2-03 (honest DEMO text, no apply link, focus returns to the button) and P2-20 (Enter opens details, Escape closes) passed unchanged against the new dialog.
+
+## 3. Issues found during Step 1.3 testing
+
+| Issue | Kind | Resolution |
 |---|---|---|
-| P2-01 | Shipped demo cards: DEMO badge, type, mode; no invented pay/dates/status | PASS |
-| P2-02 | Experience shown only when known (Entry-level shown; unknown not shown) | PASS |
-| P2-03 | View details dialog: honest DEMO text, no apply link, focus returns to button | PASS |
-| P2-04 | Status badges follow evidence: VERIFIED needs evidenceUrl, else shown Unverified; DEMO stays Demo | PASS |
-| P2-05 | Compensation, experience, employment type and dates appear only when known; past deadline flagged | PASS |
-| P2-06 | Injected HTML/javascript: URLs in data are escaped/ignored | PASS |
-| P2-07 | Dialog links: apply/evidence only for non-DEMO listings that have them; external links use rel=noopener; no 'submitted' claims | PASS |
-| P2-08 | Saved-only view: count label, filters combine, unbookmarking updates list, Clear all resets | PASS |
-| P2-09 | Saved-only with nothing saved shows an honest empty state | PASS |
-| P2-10 | Bookmark button: stable accessible name + aria-pressed, focus kept after toggle | PASS |
-| P2-11 | localStorage holds a plain id array under nexora:demo-saved | PASS |
-| P2-12 | Corrupted / odd stored bookmark data is ignored safely (no errors, valid ids only) | PASS |
-| P2-13 | Storage blocked: no errors, bookmarks work for the visit, user is told they won't persist | PASS |
-| P2-14 | Storage write fails (quota): no errors, state kept in memory, user told | PASS |
-| P2-15 | Bookmark changes in another tab are reflected (storage event) | PASS |
-| P2-16 | Every button, link, input and select has an accessible name | PASS |
-| P2-17 | Search and filter controls have programmatic labels | PASS |
-| P2-18 | Visible focus indicator (>=2px outline on element or its field wrapper) on key controls | PASS |
-| P2-19 | Keyboard: search, filters, bookmark and details buttons reachable with Tab | PASS |
-| P2-20 | Keyboard: Enter/Space toggle bookmark, Enter opens details, Escape closes | PASS |
-| P2-21 | Semantics: one h1/main, lang, unique ids, labelled navs, skip link, live regions | PASS |
-| P2-22 | Colour contrast of design-token pairs >= 4.5:1 (WCAG AA) | PASS |
-| P2-23 | Card and search action buttons are at least 40px in both dimensions | PASS |
-| P2-24 | Page still runs with no JS errors when optional elements are missing (15 variants) | PASS |
-| P2-25 | Pure helpers: formatSalary/formatDate/isPast/safeUrl/saved filter/cleanSavedIds | PASS |
-| P2-26 | Remote listing shows 'Remote' once (location duplicate suppressed) | PASS |
-| P2-27 | Emulated touch phone (390px): tap bookmark, details, menu, saved view; no overflow/errors | PASS |
+| S13-25 reported horizontal overflow of the page at 320px | **Real (minor) page defect, not in the dialog.** A very long unbroken word in a company or title (the HTML-injection test record) widened the card grid. Reproduced with no dialog open. With the six shipped listings the page did not overflow. | Added `min-width: 0; overflow-wrap: anywhere` to `.opp`. No visual change for normal text. Re-run: passes at all six widths. |
+| S13-09 first failed on "scroll lock released" | **Test timing bug, not an app bug.** The check read the page style before the dialog's asynchronous `close` event had fired. A separate probe showed the lock released correctly right after Escape. | The check now waits (up to 1.5 s) for the dialog to close and the lock to clear. |
+| S13-09 first failed on "focus stays inside" | **Test assumption.** Chromium's extra native Tab stop (see note above) made `activeElement` the `<body>` once per cycle; focus never reached a page control. | The check accepts `<body>` and still fails on any page control. |
 
-Notes on how some checks work:
+| S13-07 failed once (focus after closing) when I re-ran the suite from the freshly extracted ZIP | **Test timing bug, not an app bug.** The dialog's `close` event, where the focus fallback runs, is asynchronous, and the check read `document.activeElement` immediately after Escape. A 15-run probe showed focus was wrong immediately after Escape in 7 runs and wrong in 0 runs once the event had run. The earlier pass was luck. | Every close-then-inspect check now waits for the dialog to finish closing (`wait_closed`). |
 
-- **P2-04, P2-05, P2-06, P2-07** run against a temporary test dataset (injected in place of `data.js` for that test only) because the shipped demo data has no pay, dates, verified listings or links. They prove the rendering rules; they do not mean the shipped data contains such values.
-- **P2-24** removes each of 15 optional elements from a copy of `index.html` (toast, dialog, clear button, hero type select, status line, menu button and menu, Saved toggle, datalist, segmented control, active-filter list, Clear all, sort select, popular chips, count) and verifies there are no JS errors and that search still works.
-- **P2-18/P2-22** check computed outlines and a WCAG contrast calculation over the design-token colour pairs, not every rendered element.
-- The new checks were also run against the untouched Part 1 code: the 20 original checks passed and 13 new checks failed, confirming the tests can fail.
+Repeatability after that fix: `part3` ran 3 times in a row (29/29 each), the full suite ran twice from the project folder (77/77 each), and once more from the extracted `NEXORA_Step1_3.zip` (77/77). Earlier runs during development are not counted.
 
-## 3. Bugs found and fixed
+I did not run the new checks against deliberately broken code, so I have not demonstrated that each one can fail. The two failures above are the only evidence the checks are sensitive.
 
-| Bug | Found in | Steps to reproduce (on Part 1 code) | Fix |
+## 4. Mapping to the requested tests
+
+| # | Requested test | Where covered | Status |
 |---|---|---|---|
-| Valid-JSON-but-not-a-list bookmark data crashed the page and rendered zero cards (`saved.indexOf is not a function`) | Part 1 | In DevTools run `localStorage.setItem('nexora:demo-saved','{"a":1}')` (or `'5'`), reload. | Stored ids are validated by `cleanSavedIds` (arrays of whole numbers that match real listings only). |
-| Bookmark button's accessible name changed between "Bookmark:" and "Remove bookmark:" while also using `aria-pressed` (screen readers announce the state twice) | Part 1 | Inspect `[data-save]` label after toggling. | Constant name `Bookmark: <title>`; state carried by `aria-pressed`. |
-| Missing `#dialog` or `#menu-toggle` threw `Cannot read properties of null` at load and rendered zero cards (a missing `#toast` only failed later, on click) | Part 1 | Delete `#dialog` from `index.html`, open the page, check the console. | Defensive lookups in `main.js`. |
-| Text fields and filters had no focus ring (computed outline `none` on the field and its wrappers; only a faint background tint marked focus) | Part 1 | Tab into the search box or a filter select and inspect the computed outline. | 2px ring on the field/filter wrapper via `:focus-within`. |
-| Remote listings showed "Remote" twice (location and work mode) | Part 1 | View Data Analyst Intern card. | `cardFacts` hides a location identical to the work mode. |
+| 1 | Homepage still loads | core 01, 01b | PASS |
+| 2 | Search and filters still work | core 02–10 | PASS |
+| 3 | Sorting and result counts still work | core 11, 12, 13 | PASS |
+| 4 | Saved-job bookmarks work and persist | core 14, 15; P2-08..15 | PASS |
+| 5 | View details opens the correct job | S13-03, S13-04 | PASS |
+| 6 | Different jobs show their own data | S13-03, S13-13 | PASS |
+| 7 | Missing optional fields do not break the dialog | S13-14 | PASS |
+| 8 | Closing preserves search/filter context | S13-05 | PASS |
+| 9 | Save state consistent between card and details | S13-06, S13-07 | PASS |
+| 10 | DEMO cannot claim a real application | S13-02, S13-16, S13-22 | PASS |
+| 11 | Missing application URLs handled | S13-15, S13-19 | PASS |
+| 12 | Valid official URL follows the confirmation flow | S13-17, S13-20 | PASS (mocked external site) |
+| 13 | Unsafe URL schemes rejected | S13-19 | PASS |
+| 14 | Redirect does not mark an application Submitted | S13-20, S13-27 | PASS |
+| 15 | Keyboard controls and modal closing | S13-09, S13-11; P2-20 | PASS |
+| 16 | Existing navigation and styling intact | core 16, 16b, 18, 18b; screenshots reviewed by me for the new dialog | PASS (automated); the screenshot review was a visual look at three desktop views and one mobile view, not a formal design test |
+| 17 | No JavaScript errors in tested flows | S13-12, S13-24, S13-25, S13-26 | PASS |
 
-No Part 1 search, filter, sorting, count or empty-state behaviour was found broken.
+## 5. NOT TESTED
 
-## 4. NOT TESTED
+- **Real screen readers** (NVDA, JAWS, VoiceOver, TalkBack). Roles, names, descriptions and live regions were checked programmatically only.
+- **Firefox, Safari/WebKit, Edge and older browsers.** Only Chromium was available. In particular the native `<dialog>` focus handling and `close` event timing were not observed elsewhere.
+- **Real touch devices and real popup-blocker behaviour.** Only Chromium touch emulation was used. Continue is a normal link, which should avoid popup blockers, but that was not verified in other browsers.
+- **A real employer website.** External pages were mocked.
+- **Manual mobile testing by the project owner** (planned for later): NOT TESTED.
+- **The Google Font** (offline sandbox; fallback font used), **axe-core / Lighthouse audits**, **forced-colors mode**, **200% zoom**, **printing**, **Live Server** and **`npx serve .`**.
+- **Colour contrast of the new dialog components** was not separately measured. They reuse token pairs that Step 1.2 checked (text on white/mint/sage/ivory, white on primary), but the new combinations were not individually computed.
+- **Pay, date, description and application-URL rendering with real data**: the shipped data has none; only test data was used.
 
-- **Real screen readers** (NVDA, JAWS, VoiceOver, TalkBack). Accessible names, roles, labels and live regions were checked programmatically only.
-- **Firefox, Safari/WebKit, Edge and older browsers.** Only Chromium was installed. This includes how `file://` `localStorage` and `storage` events behave in those browsers.
-- **Real touch devices.** Only Chromium's mobile/touch emulation was used.
-- **The Google Font.** The sandbox is offline, so tests and screenshots used the fallback system font; layout with Plus Jakarta Sans was not observed.
-- **Automated accessibility audit (axe-core, Lighthouse)** — not available offline, not run.
-- **Windows High Contrast / forced-colors mode, browser zoom to 200%, text-only zoom, printing.**
-- **`npx serve .`** — only `python3 -m http.server` and `file://` were used.
-- **Cross-device bookmark sync** — not a feature (bookmarks are browser-local by design).
-- **Pay and date rendering with real data** — verified only with temporary test data (see notes above).
+## 6. Known limitations
 
-## 5. Known limitations (carried and new)
+- All listings are demo data; nothing can be applied to. No backend, so no submitted applications, tracking, history or recruiter responses.
+- Application records exist only in memory for the page visit and are not displayed.
+- Search is word-start only; remote jobs do not match a city search; filter state is not in the URL; bookmarks are browser-local.
+- "View details" is a dialog with no shareable URL.
+- On phones, Apply Now sits below the description, so long listings need a scroll inside the dialog.
 
-- All listings are demo data; there is no pay, dates, application URLs or employment sub-types, so related filters/sorts are disabled.
-- Search is word-start only ("script" does not match "JavaScript"); remote jobs do not match a city search.
-- Filter state, including Saved only, is not kept in the URL and resets on reload.
-- Bookmarks are browser-local, not account-based, not synced across devices; clearing site data or private browsing loses them. Stored ids that no longer match any listing are dropped.
-- The toast is visible for about 3 seconds and can briefly overlap content on small screens.
-- "View details" is a dialog, not a page.
-
-## 6. Steps to reproduce / re-run
+## 7. How to repeat the tests
 
 ```bash
 pip install playwright && playwright install chromium
-python3 tests/regression_test.py          # all checks
-python3 tests/regression_test.py core     # the 18 required tests only
-python3 tests/regression_test.py part2    # Part 2 checks only
+python3 tests/regression_test.py          # all 77 checks
+python3 tests/regression_test.py core     # 18 core regression tests
+python3 tests/regression_test.py part2    # Step 1.2 Part 2 checks
+python3 tests/regression_test.py part3    # Step 1.3 details and apply-flow checks
 ```
 
 Exit code is 0 when every check passes. Results are written to `tests/results.json`.
+
+Manual spot check (2 minutes): open `index.html`, click View details, click Apply Now (demo explanation, you stay on NEXORA), Save job, close with Escape, confirm the card is bookmarked and your search is unchanged. To see the review step, temporarily set one listing in `data.js` to `status: "UNVERIFIED"` with `applyUrl: "https://example.com/apply"`, then undo the edit.

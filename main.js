@@ -43,10 +43,32 @@
   var dialogMeta = $("#dialog-meta");
   var dialogLinks = $("#dialog-links");
 
+  var dialogX = $("#dialog-x");
+  var dialogClose = $("#dialog-close");
+  var jobView = $("#dialog-job");
+  var jobMode = false;          /* true while the dialog is showing a job instead of a plain message */
+
+  /* Switch between the plain-message layout (Soon / notices) and the job layout. */
+  function setJobMode(on) {
+    jobMode = on;
+    [dialogTitle, dialogBody, dialogLinks, dialogClose].forEach(function (el) { if (el) el.hidden = on; });
+    if (dialogMeta && on) dialogMeta.hidden = true;
+    if (dialogX) dialogX.hidden = !on;
+    if (jobView) { jobView.hidden = !on; if (!on) jobView.textContent = ""; }
+    if (dialogEl) {
+      dialogEl.classList.toggle("dialog--job", on);
+      if (!on) {
+        dialogEl.setAttribute("aria-labelledby", "dialog-title");
+        dialogEl.setAttribute("aria-describedby", "dialog-body");
+      }
+    }
+  }
+
   /* extra = { meta: "text", links: [{ href, text }] }; everything is inserted as text or as a DOM attribute, never as HTML. */
   function openDialog(title, body, extra) {
     extra = extra || {};
     if (!dialogEl || typeof dialogEl.showModal !== "function" || !dialogTitle || !dialogBody) { toast(title); return; }
+    setJobMode(false);
     dialogTitle.textContent = title;
     dialogBody.textContent = body;
     if (dialogMeta) { dialogMeta.textContent = extra.meta || ""; dialogMeta.hidden = !extra.meta; }
@@ -64,8 +86,20 @@
     }
     if (!dialogEl.open) dialogEl.showModal();
   }
-  on($("#dialog-close"), "click", function () { if (dialogEl) dialogEl.close(); });
-  on(dialogEl, "click", function (e) { if (e.target === dialogEl) dialogEl.close(); });
+  function closeDialog() { if (dialogEl && dialogEl.open) dialogEl.close(); }
+  on(dialogClose, "click", closeDialog);
+  on(dialogX, "click", closeDialog);
+  /* Only a click on the backdrop closes it, not a click on the dialog's own padding. */
+  on(dialogEl, "click", function (e) {
+    if (e.target !== dialogEl) return;
+    var r = dialogEl.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDialog();
+  });
+  /* Fires for every way of closing (buttons, Escape, backdrop): release the page scroll lock and tidy up job state. */
+  on(dialogEl, "close", function () {
+    document.body.classList.remove("is-modal");
+    onDialogClosed();
+  });
 
   /* ---------- Mobile menu ---------- */
   var menuToggle = $("#menu-toggle");
@@ -372,15 +406,18 @@
 
   /* Bookmark toggle. In the normal view only the button changes (so focus stays put);
      in the Saved-only view the list itself changes, so it is re-rendered. */
-  function toggleSaved(id) {
+  function toggleSaved(id, quiet) {
     var latest = readStorage();                       /* pick up changes made in another tab before writing */
     if (latest !== null) saved = Jobs.cleanSavedIds(latest, allJobs);
     var idx = saved.indexOf(id);
     var adding = idx === -1;
     if (adding) saved.push(id); else saved.splice(idx, 1);
     var kept = writeStorage();
-    if (adding) toast(kept ? "Bookmarked in this browser only" : "Bookmarked for this visit only. Your browser is blocking storage, so it will not be kept.");
-    else toast(kept ? "Bookmark removed" : "Bookmark removed for this visit only (browser storage is unavailable).");
+    var msg = adding
+      ? (kept ? "Bookmarked in this browser only" : "Bookmarked for this visit only. Your browser is blocking storage, so it will not be kept.")
+      : (kept ? "Bookmark removed" : "Bookmark removed for this visit only (browser storage is unavailable).");
+    if (!quiet) toast(msg);     /* a toast sits behind an open dialog, so the dialog shows this message itself */
+    return msg;
   }
   function refreshSaveButtons() {
     $$("[data-save]", grid).forEach(function (b) { b.setAttribute("aria-pressed", String(saved.indexOf(Number(b.dataset.save)) !== -1)); });
@@ -415,25 +452,329 @@
     if (e.key !== null && e.key !== SAVED_KEY) return;
     loadSaved();
     render();
+    syncDetailSave();
   });
 
-  /* "View details": a simple dialog built from the same data as the card. It never claims anything was applied for or submitted. */
-  function showDetails(o) {
-    var facts = Jobs.cardFacts(o).filter(function (f) { return f.kind !== "pay" && f.kind !== "posted" && f.kind !== "deadline"; }).map(function (f) { return f.text; });
-    facts.unshift(o.type);
-    var rest = Jobs.cardFacts(o).filter(function (f) { return f.kind === "pay" || f.kind === "posted" || f.kind === "deadline"; }).map(function (f) { return f.text; });
-    var note;
-    if (o.status === "DEMO") {
-      note = "This is a demo listing from a fictional company. It is not a real vacancy and there is nothing to apply to. Role details and official application links will appear here once real opportunity data is connected.";
-    } else if (o.status === "VERIFIED") {
-      note = "NEXORA has evidence for this listing (see the link below). NEXORA does not take applications yet, so use the employer’s own page to respond to it.";
-    } else {
-      note = "NEXORA has not verified this listing. Check the employer’s own website before sharing personal details. NEXORA does not take applications yet.";
+  /* ---------- Job details and apply flow (Step 1.3) ----------
+     One dialog (#dialog) shows the details of the selected job, built from the central data by the job's id.
+     "Apply Now" never submits anything. Depending on the listing it explains (DEMO), explains why it cannot
+     continue (no official link), or shows a review step and then opens the official site in a new tab.
+     All job content is inserted with textContent / DOM attributes, never as HTML. Click handling uses one
+     delegated listener on #dialog-job, so re-opening the dialog never stacks up listeners. */
+  var Apps = window.NexoraApplications;
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var detail = null;            /* { job, dest } while the details dialog is open */
+  var lastRedirectAt = 0;       /* guards against a double click opening two tabs */
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+  function iconEl(name, extraClass) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "icon" + (extraClass ? " " + extraClass : ""));
+    svg.setAttribute("aria-hidden", "true");
+    var use = document.createElementNS(SVG_NS, "use");
+    use.setAttribute("href", "#i-" + name);
+    svg.appendChild(use);
+    return svg;
+  }
+  function statusBadgeEl(o) {
+    var span = el("span", "badge " + (o.status === "VERIFIED" ? "badge--verified" : o.status === "UNVERIFIED" ? "badge--unverified" : "badge--demo"));
+    if (o.status === "VERIFIED") span.appendChild(iconEl("check"));
+    span.appendChild(document.createTextNode(statusLabel(o)));
+    return span;
+  }
+  function section(heading) {
+    var s = el("section", "jv__section");
+    s.appendChild(el("h3", null, heading));
+    return s;
+  }
+  function listSection(heading, items) {
+    var s = section(heading);
+    var ul = el("ul", "jv__list");
+    items.forEach(function (t) { ul.appendChild(el("li", null, t)); });
+    s.appendChild(ul);
+    return s;
+  }
+  function setStatus(text) { var n = $("#jv-status", jobView); if (n) n.textContent = text || ""; }
+
+  function statusNote(o) {
+    if (o.status === "DEMO") return "This is a demo listing from a fictional company, shown to illustrate how NEXORA will look. It is not a real vacancy and it cannot accept an application.";
+    if (o.status === "VERIFIED") return "NEXORA holds evidence for this listing (see the verification link below). NEXORA does not accept applications itself yet. Applications are made on the employer’s own website.";
+    return "NEXORA has not verified this listing or the employer. Check the employer’s own website before you share personal details. NEXORA does not accept applications itself yet.";
+  }
+
+  function buildDetailsView(o, dest) {
+    var view = el("div", "jv__view");
+    view.id = "jv-details";
+
+    var head = el("div", "jv__head");
+    var mark = el("span", "jv__mark", firstChar(o.company));
+    mark.setAttribute("aria-hidden", "true");
+    var who = el("div");
+    who.appendChild(el("div", "opp__company", o.company));
+    who.appendChild(statusBadgeEl(o));
+    head.appendChild(mark);
+    head.appendChild(who);
+    view.appendChild(head);
+
+    var title = el("h2", "jv__title", o.title);
+    title.id = "jv-title";
+    title.tabIndex = -1;
+    view.appendChild(title);
+
+    var facts = el("ul", "jv__facts");
+    var typeLi = el("li");
+    typeLi.appendChild(iconEl("briefcase"));
+    typeLi.appendChild(el("span", "sr-only", "Opportunity type: "));
+    typeLi.appendChild(document.createTextNode(o.type));
+    facts.appendChild(typeLi);
+    Jobs.cardFacts(o).forEach(function (f) {
+      var li = el("li");
+      li.appendChild(iconEl(f.icon));
+      if (f.label) li.appendChild(el("span", "sr-only", f.label + ": "));
+      li.appendChild(document.createTextNode(f.text));
+      facts.appendChild(li);
+    });
+    view.appendChild(facts);
+
+    var note = el("p", "jv__note jv__note--" + (o.status === "DEMO" ? "demo" : o.status === "UNVERIFIED" ? "caution" : "verified"), statusNote(o));
+    note.id = "jv-summary";
+    view.appendChild(note);
+    if (o.status === "VERIFIED" && o.evidenceUrl) {
+      var ev = el("a", "link", "See verification evidence (opens in a new tab)");
+      ev.href = o.evidenceUrl; ev.target = "_blank"; ev.rel = "noopener noreferrer";
+      view.appendChild(ev);
     }
-    var links = [];
-    if (o.status === "VERIFIED" && o.evidenceUrl) links.push({ href: o.evidenceUrl, text: "See verification evidence" });
-    if (o.status !== "DEMO" && o.applyUrl) links.push({ href: o.applyUrl, text: "Go to the employer’s listing" });
-    openDialog(o.title + " · " + o.company, (o.description ? o.description + " " : "") + note, { meta: facts.concat(rest).join(" · "), links: links });
+
+    if (o.skills.length) {
+      var sk = section("Skills");
+      var tags = el("ul", "tags");
+      tags.setAttribute("aria-label", "Skills");
+      o.skills.forEach(function (t) { tags.appendChild(el("li", null, t)); });
+      sk.appendChild(tags);
+      view.appendChild(sk);
+    }
+
+    var about = section("About this opportunity");
+    var paras = Jobs.paragraphs(o.description);
+    if (paras.length) paras.forEach(function (p) { about.appendChild(el("p", null, p)); });
+    else about.appendChild(el("p", null, "No description has been provided for this listing."));
+    view.appendChild(about);
+
+    if (o.responsibilities.length) view.appendChild(listSection("Responsibilities", o.responsibilities));
+    if (o.qualifications.length) view.appendChild(listSection("Qualifications", o.qualifications));
+    if (o.benefits.length) view.appendChild(listSection("Benefits", o.benefits));
+
+    var missing = Jobs.missingFields(o).filter(function (m) { return m !== "Description"; });
+    if (missing.length) view.appendChild(el("p", "jv__missing", "Not provided for this listing: " + missing.join(", ") + "."));
+
+    /* Apply area: the button is always labelled "Apply Now"; what it does depends on the listing's real data. */
+    var apply = el("div", "jv__apply");
+    var msg;
+    if (dest.kind === "demo") msg = "This is a demonstration listing, so Apply Now does not start a real application.";
+    else if (dest.kind === "none") msg = "An official application destination is not currently available for this listing.";
+    else msg = "Applications for this role are made on the employer’s own website (" + dest.host + "). You will be asked to review before you leave NEXORA.";
+    var msgEl = el("p", null, msg);
+    msgEl.id = "jv-apply-msg";
+    apply.appendChild(msgEl);
+
+    var actions = el("div", "jv__actions");
+    var applyBtn = el("button", "btn btn--primary btn--lg");
+    applyBtn.type = "button"; applyBtn.id = "jv-apply"; applyBtn.dataset.action = "apply";
+    applyBtn.appendChild(document.createTextNode("Apply Now"));
+    if (dest.kind === "external" || dest.kind === "external-verified") applyBtn.appendChild(iconEl("external"));
+    applyBtn.setAttribute("aria-describedby", "jv-apply-msg");
+    if (dest.kind === "none") applyBtn.setAttribute("aria-disabled", "true");   /* stays focusable so the reason can be read */
+    actions.appendChild(applyBtn);
+
+    var saveBtn = el("button", "btn btn--secondary btn--lg jv__save");
+    saveBtn.type = "button"; saveBtn.id = "jv-save"; saveBtn.dataset.action = "save";
+    saveBtn.appendChild(iconEl("bookmark"));
+    saveBtn.appendChild(document.createTextNode("Save job"));
+    saveBtn.appendChild(el("span", "sr-only", ": " + o.title));
+    actions.appendChild(saveBtn);
+
+    var closeBtn = el("button", "btn btn--text btn--lg", "Close");
+    closeBtn.type = "button"; closeBtn.dataset.action = "close";
+    actions.appendChild(closeBtn);
+    apply.appendChild(actions);
+    view.appendChild(apply);
+    return view;
+  }
+
+  function summaryRow(dl, label, value) {
+    dl.appendChild(el("dt", null, label));
+    var dd = el("dd");
+    if (typeof value === "string") dd.textContent = value; else dd.appendChild(value);
+    dl.appendChild(dd);
+  }
+
+  /* Review step: shown only when a safe official URL exists. It is a confirmation, not a form: it asks for nothing. */
+  function buildReviewView(d) {
+    var o = d.job, dest = d.dest;
+    var view = el("div", "jv__view");
+    view.id = "jv-review";
+    var h = el("h3", "jv__title", "Review before you leave NEXORA");
+    h.tabIndex = -1; h.id = "jv-review-title";
+    view.appendChild(h);
+
+    var dl = el("dl", "jv__summary");
+    summaryRow(dl, "Job", o.title);
+    summaryRow(dl, "Company", o.company);
+    summaryRow(dl, "Website", dest.host);
+    summaryRow(dl, "Listing status", statusBadgeEl(o));
+    view.appendChild(dl);
+
+    view.appendChild(el("p", null, "You are about to leave NEXORA. Continuing opens " + dest.host + " in a new tab. That website belongs to someone else and NEXORA does not control it. Opening it does not submit an application, and NEXORA will not be able to see what you do there."));
+    if (o.status !== "VERIFIED") {
+      view.appendChild(el("p", "jv__note jv__note--caution", "Caution: NEXORA has not verified this listing. Check that the website address looks right, and be careful with personal details. Be wary of any request for payment to apply."));
+    }
+    if (!dest.secure) view.appendChild(el("p", "jv__note jv__note--caution", "This address uses http rather than https, so your connection to that website is not encrypted."));
+    if (o.deadline && Jobs.isPast(o.deadline)) view.appendChild(el("p", "jv__note", "The listed deadline for this opportunity has passed."));
+
+    var actions = el("div", "jv__actions");
+    var go = el("a", "btn btn--primary btn--lg");
+    go.id = "jv-continue";
+    go.href = dest.url; go.target = "_blank"; go.rel = "noopener noreferrer";
+    var label = el("span", null, "Continue to application");
+    label.id = "jv-continue-label";
+    go.appendChild(label);
+    go.appendChild(iconEl("external"));
+    actions.appendChild(go);
+    var cancel = el("button", "btn btn--secondary btn--lg", "Cancel");
+    cancel.type = "button"; cancel.dataset.action = "back"; cancel.id = "jv-cancel";
+    actions.appendChild(cancel);
+    view.appendChild(actions);
+    return view;
+  }
+
+  function buildDemoView(d) {
+    var view = el("div", "jv__view");
+    view.id = "jv-demo";
+    var h = el("h3", "jv__title", "This is a demo listing");
+    h.tabIndex = -1; h.id = "jv-demo-title";
+    view.appendChild(h);
+    view.appendChild(el("p", null, d.job.company + " is a fictional company and this opportunity is sample data used to show how NEXORA works. It cannot accept a real application, so nothing was sent or saved, and you are staying on NEXORA."));
+    view.appendChild(el("p", null, "You can still bookmark it to try out Saved jobs, or browse the other opportunities."));
+    var actions = el("div", "jv__actions");
+    var back = el("button", "btn btn--primary btn--lg", "Back to details");
+    back.type = "button"; back.dataset.action = "back"; back.id = "jv-back";
+    actions.appendChild(back);
+    var close = el("button", "btn btn--secondary btn--lg", "Close");
+    close.type = "button"; close.dataset.action = "close";
+    actions.appendChild(close);
+    view.appendChild(actions);
+    return view;
+  }
+
+  /* Show "details", "review" or "demo". Only one is visible; review/demo are rebuilt each time so no stale state stays. */
+  function showView(name) {
+    if (!detail) return;
+    ["#jv-review", "#jv-demo"].forEach(function (sel) { var old = $(sel, jobView); if (old) old.remove(); });
+    var main = $("#jv-details", jobView);
+    setStatus("");
+    if (name === "details") {
+      main.hidden = false;
+      var again = $("#jv-apply", jobView);
+      if (again) again.focus();
+      dialogEl.setAttribute("aria-labelledby", "jv-title");
+      dialogEl.setAttribute("aria-describedby", "jv-summary");
+      return;
+    }
+    main.hidden = true;
+    var v = name === "review" ? buildReviewView(detail) : buildDemoView(detail);
+    jobView.insertBefore(v, $("#jv-status", jobView));
+    var hid = name === "review" ? "jv-review-title" : "jv-demo-title";
+    dialogEl.setAttribute("aria-labelledby", hid);
+    dialogEl.removeAttribute("aria-describedby");
+    $("#" + hid, jobView).focus();
+    dialogEl.scrollTop = 0;
+  }
+
+  /* Keep the Save button in the dialog in step with the same saved[] list the cards use. */
+  function syncDetailSave() {
+    if (!detail) return;
+    var btn = $("#jv-save", jobView);
+    if (btn) btn.setAttribute("aria-pressed", String(saved.indexOf(detail.job.id) !== -1));
+  }
+
+  function recordExternalRedirect(job, dest) {
+    if (!Apps) return;
+    var res = Apps.createRecord({ jobId: job.id, method: Apps.METHODS.EXTERNAL_REDIRECT, destinationHost: dest.host, isDemo: false });
+    if (res.ok) Apps.getStore().save(res.record);   /* in memory only: no backend, nothing is persisted */
+  }
+
+  function onContinueClick(e) {
+    var link = e.target.closest("#jv-continue");
+    var d = detail;
+    var dest = d ? Jobs.applyDestination(d.job) : null;
+    var allowed = dest && (dest.kind === "external" || dest.kind === "external-verified") && link.href === dest.url;
+    var now = Date.now();
+    if (!allowed || now - lastRedirectAt < 1500) { e.preventDefault(); return; }   /* never navigate to anything unchecked, never twice at once */
+    lastRedirectAt = now;
+    recordExternalRedirect(d.job, dest);
+    var label = $("#jv-continue-label", jobView);
+    if (label) label.textContent = "Open application website again";
+    setStatus("Opened " + dest.host + " in a new tab. NEXORA cannot see what happens on that website, so this is not counted as an application. Finish and confirm your application there.");
+  }
+
+  on(jobView, "click", function (e) {
+    if (!detail) return;
+    if (e.target.closest("#jv-continue")) { onContinueClick(e); return; }
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    switch (btn.dataset.action) {
+      case "apply":
+        if (btn.getAttribute("aria-disabled") === "true") { setStatus("An official application destination is not currently available for this listing, so there is nowhere to apply from here."); break; }
+        showView(detail.dest.kind === "demo" ? "demo" : "review");
+        break;
+      case "save":
+        var msg = toggleSaved(detail.job.id, true);
+        if (state.saved) render(); else refreshSaveButtons();
+        syncDetailSave();
+        setStatus(msg);
+        break;
+      case "back": showView("details"); break;
+      case "close": closeDialog(); break;
+    }
+  });
+
+  function showDetails(o) {
+    if (!jobView || !dialogEl || typeof dialogEl.showModal !== "function") {
+      openDialog(o.title + " · " + o.company, statusNote(o));      /* very old browser or stripped markup: plain text fallback */
+      return;
+    }
+    detail = { job: o, dest: Jobs.applyDestination(o) };
+    setJobMode(true);
+    jobView.textContent = "";
+    jobView.appendChild(buildDetailsView(o, detail.dest));
+    var status = el("p", "jv__status");
+    status.id = "jv-status";
+    status.setAttribute("role", "status");
+    jobView.appendChild(status);
+    dialogEl.setAttribute("aria-labelledby", "jv-title");
+    dialogEl.setAttribute("aria-describedby", "jv-summary");
+    syncDetailSave();
+    dialogEl.scrollTop = 0;
+    if (!dialogEl.open) { document.body.classList.add("is-modal"); dialogEl.showModal(); }
+  }
+
+  /* Called from the dialog's close event. The browser normally returns focus to the button that opened the
+     dialog; if that button no longer exists (for example it was un-bookmarked in the Saved-only view), focus a sensible place. */
+  function onDialogClosed() {
+    var d = detail;
+    detail = null;
+    if (!jobMode) return;
+    setJobMode(false);
+    var a = document.activeElement;
+    if (d && (!a || a === document.body)) {
+      var target = $('[data-view="' + d.job.id + '"]', grid) || savedToggle || keywordInput;
+      if (target && target.focus) target.focus();
+    }
   }
 
   /* Nav links: "Opportunities" shows everything; "Internships" shows internships. Anchors still scroll. */

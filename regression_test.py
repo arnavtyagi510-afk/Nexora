@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NEXORA regression tests (Step 1.2). OPTIONAL developer tool: the website itself needs no tooling.
+"""NEXORA regression tests (Step 1.2 + Step 1.3). OPTIONAL developer tool: the website itself needs no tooling.
 
 Requires: python3 + `pip install playwright` + `playwright install chromium`.
 Run from the project root:   python3 tests/regression_test.py
@@ -317,9 +317,10 @@ def part2(b, http_url):
         a = s.page.eval_on_selector_all("#dialog a", "a => a.map(x => ({h: x.href, r: x.rel, t: x.target, txt: x.textContent}))")
         txt = s.page.inner_text("#dialog"); s.page.keyboard.press("Escape")
         s.page.click("[data-view='4']"); d = s.page.locator("#dialog a").count(); dt = s.page.inner_text("#dialog"); s.page.keyboard.press("Escape")
-        okl = len(a) >= 1 and all("noopener" in x["r"] and x["t"] == "_blank" for x in a) and any("example.com/apply" in x["h"] for x in a) and any("example.com/proof" in x["h"] for x in a)
+        # Step 1.3: the apply link is no longer shown in the details view; it appears only after the review step.
+        okl = len(a) == 1 and all("noopener" in x["r"] and x["t"] == "_blank" for x in a) and any("example.com/proof" in x["h"] for x in a) and not any("example.com/apply" in x["h"] for x in a)
         return (okl and d == 0 and "submitted" not in (txt + dt).lower()) or (a, d)
-    check("P2-07 Dialog links: apply/evidence only for non-DEMO listings that have them; external links use rel=noopener; no 'submitted' claims", t_links)
+    check("P2-07 Details links: evidence link only for VERIFIED listings; apply URL hidden until review step; rel=noopener; no 'submitted' claims", t_links)
     s.close()
 
     # --- bookmarks, part 2
@@ -467,7 +468,7 @@ def part2(b, http_url):
         pg.goto(FILE_URL); pg.wait_for_selector("#opps-grid .opp")
         pg.tap("[data-save='2']"); a = pg.get_attribute("[data-save='2']", "aria-pressed")
         pg.tap("[data-view='2']"); o = pg.evaluate("document.getElementById('dialog').open")
-        pg.tap("#dialog-close"); c = not pg.evaluate("document.getElementById('dialog').open")
+        pg.tap("#dialog-x"); c = not pg.evaluate("document.getElementById('dialog').open")
         pg.tap("#menu-toggle"); m = pg.locator("#mobile-menu").is_visible(); pg.tap("#menu-toggle")
         pg.tap("#saved-toggle"); n = pg.locator("#opps-grid .opp").count()
         sw, cw = pg.evaluate("[document.documentElement.scrollWidth, document.documentElement.clientWidth]")
@@ -538,6 +539,425 @@ def units(b):
     check("P2-25 Pure helpers: formatSalary/formatDate/isPast/safeUrl/saved filter/cleanSavedIds", u)
     s.close()
 
+
+# ---------------------------------------------------------------- Step 1.3: job details and apply flow
+LONG_DESC = "\n\n".join(["Paragraph %d. " % i + ("This sentence makes the description long enough to check wrapping and readability. " * 6) for i in range(1, 4)])
+TEST_DATA_13 = r"""
+window.NEXORA_DEMO = { opportunities: [
+ { id: 1, company: "Acme Test Co", title: "Verified Role", logo: null, category: "Technology", type: "Job", employmentType: "Full-time", mode: "Hybrid", location: "Pune",
+   salary: { min: 400000, max: 600000, currency: "INR", period: "year" }, experience: "Entry-level", skills: ["Go", "SQL"], description: __LONG__,
+   responsibilities: ["Build the thing", "Review the thing"], qualifications: ["A degree or equivalent"], benefits: ["Learning budget"],
+   postedDate: "2026-10-01", deadline: "2099-12-31", applyUrl: "https://jobs.example.org/apply?ref=nexora", status: "VERIFIED", evidenceUrl: "https://example.com/proof", tags: [] },
+ { id: 2, company: "Unver Ltd", title: "Unverified Http Role", logo: null, category: "Design", type: "Internship", employmentType: null, mode: "Remote", location: "Remote",
+   salary: null, experience: "Internship", skills: ["Figma"], description: "Short text.", postedDate: "2026-09-01", deadline: "2020-01-01", applyUrl: "http://careers.example.net/job/2", status: "UNVERIFIED", evidenceUrl: null, tags: [] },
+ { id: 3, company: "NoLink Co", title: "Unverified No Link", logo: null, category: "Business", type: "Job", employmentType: null, mode: "On-site", location: "Delhi",
+   salary: null, experience: null, skills: [], description: null, postedDate: null, deadline: null, applyUrl: null, status: "UNVERIFIED", evidenceUrl: null, tags: [] },
+ { id: 4, company: "Demo Corp", title: "Demo With Apply Url", logo: null, category: "Business", type: "Job", employmentType: null, mode: "Remote", location: "Remote",
+   salary: null, experience: null, skills: ["Excel"], description: null, postedDate: null, deadline: null, applyUrl: "https://example.com/should-not-show", status: "DEMO", evidenceUrl: null, tags: [] },
+ { id: 5, company: "Fake Verified Inc", title: "Claims Verified No Proof", logo: null, category: "Technology", type: "Job", employmentType: null, mode: "Remote", location: "Remote",
+   salary: null, experience: null, skills: [], description: null, postedDate: null, deadline: null, applyUrl: "https://jobs.example.org/five", status: "VERIFIED", evidenceUrl: null, tags: [] },
+ { id: 6, company: "Messy Co", title: "Malformed Optional Fields", logo: null, category: "Technology", type: "Job", mode: "Remote", location: "Remote",
+   salary: { min: "x" }, experience: 7, skills: "notanarray", description: 12345, responsibilities: "str", qualifications: [1, null, ""], benefits: {}, postedDate: "2026-13-45", deadline: {},
+   applyUrl: "javascript:window.__xss=2", status: "UNVERIFIED", evidenceUrl: "javascript:window.__xss=3", tags: null },
+ { id: 7, company: "Cred Co", title: "Credential URL Role", logo: null, category: "Technology", type: "Job", mode: "Remote", location: "Remote", skills: [], description: null,
+   applyUrl: "https://trusted.example.com@evil.example.net/apply", status: "UNVERIFIED", evidenceUrl: null },
+ { id: 8, company: "Data Co", title: "Data URL Role", logo: null, category: "Technology", type: "Job", mode: "Remote", location: "Remote", skills: [], description: null,
+   applyUrl: "data:text/html,<script>window.__xss=4</script>", status: "UNVERIFIED", evidenceUrl: null },
+ { id: 9, company: "Min Co", title: "Minimal Role", type: "Job", mode: "Remote", status: "UNVERIFIED" },
+ { id: 10, company: "<img src=x onerror=window.__xss=1>", title: "<b>Injected</b> Title", logo: null, category: "Marketing", type: "Job", mode: "Remote", location: "Remote", skills: ["<i>x</i>"],
+   description: "<script>window.__xss=5</script>\n\n<b>bold?</b>", applyUrl: "https://jobs.example.org/xss", status: "UNVERIFIED", evidenceUrl: null }
+] };
+""".replace("__LONG__", json.dumps(LONG_DESC))
+
+def with_data13(b, http_url, **kw):
+    def handler(route):
+        route.fulfill(status=200, content_type="application/javascript", body=TEST_DATA_13)
+    return Site(b, url=http_url, route=("**/assets/js/data.js", handler), **kw)
+
+EXTERNAL_PAGE = "<!doctype html><title>External test page</title><p>fake employer site</p>"
+def fake_external(ctx):
+    ctx.route("https://jobs.example.org/**", lambda r: r.fulfill(status=200, content_type="text/html", body=EXTERNAL_PAGE))
+    ctx.route("http://careers.example.net/**", lambda r: r.fulfill(status=200, content_type="text/html", body=EXTERNAL_PAGE))
+    ctx.route("https://example.com/**", lambda r: r.fulfill(status=200, content_type="text/html", body=EXTERNAL_PAGE))
+
+def dlg_open(s): return s.page.evaluate("document.getElementById('dialog').open")
+def dlg_text(s): return s.page.inner_text("#dialog")
+def open_job(s, jid):
+    s.page.click("[data-view='%d']" % jid); s.page.wait_for_selector("#dialog[open] #jv-title")
+def wait_closed(s):
+    # The dialog's 'close' event (scroll-lock release, focus fallback) fires asynchronously, so wait for it before inspecting the page.
+    s.page.wait_for_function("!document.getElementById('dialog').open && !document.body.classList.contains('is-modal')", timeout=2000)
+def close_esc(s):
+    s.page.keyboard.press("Escape"); wait_closed(s)
+def apps_store(s): return s.page.evaluate("NexoraApplications.getStore().list()")
+
+def part3(b, http_url):
+    # ---------- shipped DEMO data
+    s = Site(b)
+    def t_demo_details():
+        open_job(s, 1)
+        t = dlg_text(s)
+        links = s.page.locator("#dialog a").count()
+        ok = ("Demo listing" in t and "Fernhill Labs" in t and "Junior Frontend Developer" in t and "Hybrid" in t and "Bengaluru" in t
+              and "React" in t and "fictional" in t.lower() and links == 0)
+        close_esc(s)
+        return ok or t
+    check("S13-01 Shipped DEMO listing: details show its own data, DEMO badge, fictional notice, no links", t_demo_details)
+    def t_demo_apply():
+        open_job(s, 2)
+        url0 = s.page.url; pages0 = len(s.ctx.pages)
+        s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-demo")
+        t = dlg_text(s)
+        low = t.lower()
+        ok = ("demo listing" in low and "cannot accept a real application" in low and "staying on nexora" in low
+              and s.page.url == url0 and len(s.ctx.pages) == pages0
+              and "application was submitted" not in low and "applied successfully" not in low and "submitted!" not in low
+              and s.page.locator("#jv-continue").count() == 0 and len(apps_store(s)) == 0)
+        s.page.click("#jv-back"); back = s.page.locator("#jv-details").is_visible() and s.page.evaluate("document.activeElement.id") == "jv-apply"
+        close_esc(s)
+        return (ok and back) or (t, s.page.url, back)
+    check("S13-02 DEMO Apply Now: explains it is sample data, stays on NEXORA, no new tab, no record, no 'submitted' claim, Back works", t_demo_apply)
+    def t_each_job_own_data():
+        seen = {}
+        for jid in range(1, 7):
+            open_job(s, jid)
+            seen[jid] = (s.page.inner_text("#jv-title"), s.page.inner_text("#dialog .jv__head .opp__company"))
+            close_esc(s)
+        titles = [s.page.inner_text("#opps-grid li:nth-child(%d) .opp__title" % i) for i in range(1, 7)]
+        companies = [s.page.inner_text("#opps-grid li:nth-child(%d) .opp__company" % i) for i in range(1, 7)]
+        ok = all(seen[i][0] == titles[i - 1] and seen[i][1] == companies[i - 1] for i in range(1, 7)) and len(set(v[0] for v in seen.values())) == 6
+        return ok or (seen, titles)
+    check("S13-03 Every shipped job opens its own, different details", t_each_job_own_data)
+    def t_correct_after_sort_filter():
+        s.select("#sort-by", "title")
+        order = s.titles()
+        bad = []
+        for i, t in enumerate(order, 1):
+            s.page.click("#opps-grid li:nth-child(%d) [data-view]" % i); s.page.wait_for_selector("#dialog[open] #jv-title")
+            got = s.page.inner_text("#jv-title"); close_esc(s)
+            if got != t: bad.append((t, got))
+        s.select("#sort-by", "relevance")
+        s.select("#filter-mode", "Remote"); order2 = s.titles()
+        for i, t in enumerate(order2, 1):
+            s.page.click("#opps-grid li:nth-child(%d) [data-view]" % i); s.page.wait_for_selector("#dialog[open] #jv-title")
+            got = s.page.inner_text("#jv-title"); close_esc(s)
+            if got != t: bad.append((t, got))
+        s.clear_all()
+        return not bad or bad
+    check("S13-04 The selected job is correct after sorting and after filtering", t_correct_after_sort_filter)
+    def t_context():
+        s.search("analyst"); before = (s.titles(), s.page.input_value("#search-keyword"))
+        s.select("#filter-type", "Internship"); b2 = (s.titles(), s.page.input_value("#filter-type"), s.count_text())
+        s.page.click("#opps-grid li:nth-child(1) [data-view]"); s.page.wait_for_selector("#dialog[open] #jv-title")
+        s.page.click("#dialog-x"); wait_closed(s)
+        after = (s.titles(), s.page.input_value("#search-keyword"), s.page.input_value("#filter-type"), s.count_text())
+        focus = s.page.evaluate("document.activeElement && document.activeElement.dataset.view")
+        s.page.click("#opps-grid li:nth-child(1) [data-view]"); s.page.wait_for_selector("#dialog[open] #jv-title")
+        s.page.click("#dialog [data-action=close]"); wait_closed(s); after2 = (s.titles(), s.count_text()); closed = not dlg_open(s)
+        s.page.click("#opps-grid li:nth-child(1) [data-view]"); s.page.wait_for_selector("#dialog[open] #jv-title")
+        s.page.mouse.click(3, 3); wait_closed(s); after3 = s.titles(); closed3 = not dlg_open(s)
+        s.clear_all(); s.page.fill("#search-keyword", ""); s.page.click("#search-form button[type=submit]")
+        ok = after == (b2[0], "analyst", "Internship", b2[2]) and focus is not None and closed and after2 == (b2[0], b2[2]) and closed3 and after3 == b2[0]
+        return ok or (before, b2, after, focus, closed, after2, closed3, after3)
+    check("S13-05 Closing (X, Close button, backdrop) keeps the search and filters; focus returns to the opener", t_context)
+    def t_save_consistency():
+        s.page.evaluate("localStorage.clear()"); s.page.reload(); s.page.wait_for_selector("#opps-grid .opp")
+        open_job(s, 3)
+        a = s.page.get_attribute("#jv-save", "aria-pressed")
+        s.page.click("#jv-save"); b2 = s.page.get_attribute("#jv-save", "aria-pressed"); card = s.page.get_attribute("[data-save='3']", "aria-pressed"); lab = s.page.inner_text("#saved-toggle")
+        stored = s.page.evaluate("localStorage.getItem('nexora:demo-saved')"); msg = s.page.inner_text("#jv-status")
+        close_esc(s)
+        card_after = s.page.get_attribute("[data-save='3']", "aria-pressed")
+        s.page.click("[data-save='5']")
+        open_job(s, 5); five = s.page.get_attribute("#jv-save", "aria-pressed"); close_esc(s)
+        open_job(s, 3); three = s.page.get_attribute("#jv-save", "aria-pressed")
+        s.page.click("#jv-save"); off = s.page.get_attribute("#jv-save", "aria-pressed"); close_esc(s)
+        final = s.saved_pressed(); stored2 = s.page.evaluate("localStorage.getItem('nexora:demo-saved')")
+        s.page.reload(); s.page.wait_for_selector("#opps-grid .opp"); persisted = s.saved_pressed()
+        ok = (a == "false" and b2 == "true" and card == "true" and "1" in lab and stored == "[3]" and "bookmark" in msg.lower() and card_after == "true"
+              and five == "true" and three == "true" and off == "false" and final == [5] and stored2 == "[5]" and persisted == [5])
+        s.page.click("[data-save='5']")
+        return ok or (a, b2, card, lab, stored, msg, card_after, five, three, off, final, stored2, persisted)
+    check("S13-06 Save/unsave from details and cards share one state, persist, and update Saved (N)", t_save_consistency)
+    def t_saved_view():
+        s.page.click("[data-save='2']"); s.page.click("#saved-toggle")
+        open_job(s, 2); s.page.click("#jv-save")
+        behind = s.n_cards(); still_open = dlg_open(s); title = s.page.inner_text("#jv-title")
+        close_esc(s)
+        focus_ok = s.page.evaluate("document.activeElement && document.activeElement.id") == "saved-toggle"
+        s.page.click("#saved-toggle")
+        return (behind == 0 and still_open and title == "Data Analyst Intern" and focus_ok and s.errors == []) or (behind, still_open, title, focus_ok, s.errors)
+    check("S13-07 Un-saving from details in the Saved-only view: dialog stays correct, list updates, focus lands safely", t_saved_view)
+    def t_listeners():
+        s.page.evaluate("localStorage.clear()"); s.page.reload(); s.page.wait_for_selector("#opps-grid .opp")
+        for _ in range(5):
+            open_job(s, 1); close_esc(s)
+        open_job(s, 1); s.page.click("#jv-save")
+        n = s.page.evaluate("JSON.parse(localStorage.getItem('nexora:demo-saved'))")
+        s.page.click("#jv-save"); n2 = s.page.evaluate("JSON.parse(localStorage.getItem('nexora:demo-saved'))")
+        close_esc(s)
+        return (n == [1] and n2 == []) or (n, n2)
+    check("S13-08 No duplicate listeners: after 5 open/close cycles one click toggles exactly once", t_listeners)
+    def t_keyboard():
+        s.page.focus("[data-view='1']"); s.page.keyboard.press("Enter"); s.page.wait_for_selector("#dialog[open] #jv-title")
+        inside = []
+        for _ in range(14):
+            s.page.keyboard.press("Tab")
+            # Chromium adds one native Tab stop for its own UI after the last control (activeElement becomes <body>). That is not a page control.
+            inside.append(s.page.evaluate("document.activeElement === document.body || !!document.activeElement.closest('#dialog')"))
+        modal = s.page.evaluate("document.querySelector(':modal') === document.getElementById('dialog')")
+        locked = s.page.evaluate("getComputedStyle(document.body).overflow") == "hidden"
+        s.page.focus("#jv-apply"); s.page.keyboard.press("Enter"); s.page.wait_for_selector("#jv-demo")
+        h_focus = s.page.evaluate("document.activeElement.id")
+        s.page.keyboard.press("Enter"); s.page.wait_for_timeout(50)   # focus is on the heading, Enter does nothing
+        s.page.keyboard.press("Tab"); s.page.keyboard.press("Enter")   # Back to details
+        back_focus = s.page.evaluate("document.activeElement.id")
+        close_esc(s)
+        try:
+            s.page.wait_for_function("!document.getElementById('dialog').open && getComputedStyle(document.body).overflow !== 'hidden'", timeout=1500); released = True
+        except Exception:
+            released = False
+        restored = s.page.evaluate("document.activeElement.dataset.view")
+        s.page.focus("[data-view='1']"); s.page.keyboard.press("Enter"); s.page.wait_for_selector("#dialog[open]"); s.page.focus("#jv-save"); s.page.keyboard.press("Space")
+        sp = s.page.get_attribute("#jv-save", "aria-pressed"); s.page.keyboard.press("Space"); sp2 = s.page.get_attribute("#jv-save", "aria-pressed"); close_esc(s)
+        ok = all(inside) and modal and locked and h_focus == "jv-demo-title" and back_focus == "jv-apply" and released and restored == "1" and sp == "true" and sp2 == "false"
+        return ok or (inside, modal, locked, h_focus, back_focus, released, restored, sp, sp2)
+    check("S13-09 Keyboard: focus stays inside the modal, Enter/Space work, Escape closes, scroll lock released, focus restored", t_keyboard)
+    def t_semantics():
+        open_job(s, 1)
+        r = s.page.evaluate("""() => { const d = document.getElementById('dialog');
+          const lab = document.getElementById(d.getAttribute('aria-labelledby')); const desc = d.getAttribute('aria-describedby');
+          const x = document.getElementById('dialog-x');
+          return { lab: lab && lab.textContent, desc: !!(desc && document.getElementById(desc)), xName: x.getAttribute('aria-label'), xVisible: x.offsetParent !== null,
+                   status: document.getElementById('jv-status').getAttribute('role'), noEmptyBtn: [...d.querySelectorAll('button,a')].filter(e => e.offsetParent && !(e.getAttribute('aria-label') || e.textContent.trim())).length,
+                   dupIds: (() => { const ids = [...document.querySelectorAll('[id]')].map(e => e.id); return ids.filter((v, i) => ids.indexOf(v) !== i) })() } }""")
+        close_esc(s)
+        ok = r["lab"] == "Junior Frontend Developer" and r["desc"] and r["xName"] == "Close" and r["xVisible"] and r["status"] == "status" and r["noEmptyBtn"] == 0 and not r["dupIds"]
+        return ok or r
+    check("S13-10 Dialog semantics: labelled by job title, described, named close button, live status, unique ids", t_semantics)
+    def t_focus_visible():
+        open_job(s, 1)
+        bad = []
+        for sel in ["#dialog-x", "#jv-apply", "#jv-save", "#dialog [data-action=close]"]:
+            s.page.focus(sel); s.page.keyboard.press("Shift+Tab"); s.page.keyboard.press("Tab")
+            ok = s.page.evaluate("""(sel) => { const e = document.querySelector(sel); const cs = getComputedStyle(e);
+              return document.activeElement === e && cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }""", sel)
+            if not ok: bad.append(sel)
+        close_esc(s)
+        return not bad or bad
+    check("S13-11 Visible focus ring on dialog X, Apply Now, Save and Close", t_focus_visible)
+    check("S13-12 No JavaScript errors during shipped-data flows", lambda: s.errors == [] or s.errors)
+    s.close()
+
+    # ---------- injected test data
+    s = with_data13(b, http_url)
+    fake_external(s.ctx)
+    def t_full_job():
+        open_job(s, 1)
+        t = dlg_text(s)
+        paras = s.page.locator("#dialog .jv__section p").count()
+        have = all(x in t for x in ["Verified Role", "Acme Test Co", "Verified", "Job", "Hybrid", "Pune", "Full-time", "Entry-level", "4,00,000", "6,00,000", "year", "Posted 1 Oct 2026", "Apply by", "Go", "SQL",
+                                    "Paragraph 1.", "Paragraph 3.", "Responsibilities", "Build the thing", "Qualifications", "Benefits", "Learning budget"])
+        ev = s.page.eval_on_selector_all("#dialog a", "a => a.map(x => ({h: x.href, r: x.rel, t: x.target}))")
+        pw = s.page.evaluate("document.querySelector('#dialog .jv__section p').getBoundingClientRect().width")
+        missing_line = "Not provided" in t
+        close_esc(s)
+        ok = have and paras >= 3 and len(ev) == 1 and "example.com/proof" in ev[0]["h"] and "noopener" in ev[0]["r"] and ev[0]["t"] == "_blank" and pw < 700 and not missing_line
+        return ok or (have, paras, ev, pw, missing_line)
+    check("S13-13 Full record shows every known field, multi-paragraph description, optional lists, evidence link; nothing marked missing", t_full_job)
+    def t_missing_ok():
+        errs0 = len(s.errors)
+        out = {}
+        for jid in (9, 6, 3, 2):
+            open_job(s, jid); out[jid] = dlg_text(s); close_esc(s)
+        t9, t6, t3 = out[9], out[6], out[3]
+        bad = []
+        if "Minimal Role" not in t9 or "No description has been provided" not in t9 or "Not provided for this listing" not in t9: bad.append(("minimal", t9))
+        if "Responsibilities" in t9 or "Qualifications" in t9 or "Benefits" in t9 or "Skills" in t9: bad.append(("invented sections", t9))
+        if "Malformed Optional Fields" not in t6 or "No description has been provided" not in t6: bad.append(("malformed", t6))
+        if re.search(r"₹|\$|Posted|Apply by|undefined|null|NaN|\[object", t6 + t9 + t3): bad.append(("junk values", t6 + t9 + t3))
+        if "Responsibilities" in t6 or "Qualifications" in t6: bad.append(("malformed lists shown", t6))
+        return (not bad and len(s.errors) == errs0) or (bad, s.errors)
+    check("S13-14 Missing/malformed optional fields: no errors, nothing invented, unavailable fields stated or omitted", t_missing_ok)
+    def t_no_url():
+        open_job(s, 3)
+        btn = s.page.locator("#jv-apply")
+        dis = btn.get_attribute("aria-disabled"); t = dlg_text(s); url0 = s.page.url; pages0 = len(s.ctx.pages)
+        btn.click(force=True) if False else s.page.evaluate("document.getElementById('jv-apply').click()")
+        s.page.wait_for_timeout(100)
+        no_review = s.page.locator("#jv-review").count() == 0 and s.page.locator("#jv-demo").count() == 0
+        st = s.page.inner_text("#jv-status")
+        ok = dis == "true" and "not currently available" in t and no_review and "not currently available" in st and s.page.url == url0 and len(s.ctx.pages) == pages0 and "Unverified listing" in t
+        close_esc(s)
+        return ok or (dis, t, no_review, st)
+    check("S13-15 No application URL: Apply Now is aria-disabled with a visible reason, no review, no navigation, no fake link", t_no_url)
+    def t_demo_with_url():
+        open_job(s, 4)
+        hrefs = s.page.eval_on_selector_all("#dialog a", "a => a.map(x => x.href)")
+        s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-demo")
+        t = dlg_text(s); html = s.page.inner_html("#dialog")
+        ok = hrefs == [] and "example.com/should-not-show" not in html and "cannot accept a real application" in t and s.page.locator("#jv-continue").count() == 0
+        close_esc(s)
+        return ok or (hrefs, t)
+    check("S13-16 DEMO listing that carries an applyUrl still never exposes or opens it", t_demo_with_url)
+    def t_review_content():
+        open_job(s, 1)
+        s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-review")
+        t = s.page.inner_text("#jv-review")
+        a = s.page.eval_on_selector("#jv-continue", "a => ({h: a.href, r: a.rel, t: a.target, tag: a.tagName})")
+        details_hidden = not s.page.locator("#jv-details").is_visible()
+        inputs = s.page.locator("#dialog input, #dialog textarea, #dialog select, #dialog form, #dialog [type=file]").count()
+        focus = s.page.evaluate("document.activeElement.id")
+        ok = ("Verified Role" in t and "Acme Test Co" in t and "jobs.example.org" in t and "leave NEXORA" in t and "Continue to application" in t and "Cancel" in t
+              and a["h"] == "https://jobs.example.org/apply?ref=nexora" and "noopener" in a["r"] and a["t"] == "_blank" and a["tag"] == "A"
+              and details_hidden and inputs == 0 and focus == "jv-review-title" and "Caution" not in t and "not been verified" not in t
+              and "not unverified" not in t.lower())
+        s.page.click("#jv-cancel"); back = s.page.locator("#jv-details").is_visible() and s.page.evaluate("document.activeElement.id") == "jv-apply"
+        redirected = len(s.ctx.pages) == 1
+        close_esc(s)
+        return (ok and back and redirected) or (t, a, details_hidden, inputs, focus, back, redirected)
+    check("S13-17 Valid official URL: review step shows title, company, domain, leaving-NEXORA notice, Continue and Cancel; no form fields; Cancel returns", t_review_content)
+    def t_unverified_caution():
+        res = {}
+        for jid in (2, 5, 10):
+            open_job(s, jid); s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-review")
+            res[jid] = s.page.inner_text("#jv-review"); close_esc(s)
+        ok = all("Caution" in res[j] and "not verified this listing" in res[j] and "Unverified listing" in res[j] for j in res)
+        ok = ok and "http rather than https" in res[2] and "deadline" in res[2] and "http rather than https" not in res[5]
+        ok = ok and not re.search(r"(?<!Un)(?<!un)[Vv]erified listing", res[5].replace("not verified", ""))
+        return ok or res
+    check("S13-18 UNVERIFIED listings: caution shown before redirect, never described as verified; http and past-deadline warnings", t_unverified_caution)
+    def t_unsafe():
+        out = {}
+        for jid in (6, 7, 8):
+            open_job(s, jid)
+            out[jid] = (s.page.get_attribute("#jv-apply", "aria-disabled"), "not currently available" in dlg_text(s),
+                        s.page.eval_on_selector_all("#dialog a", "a => a.map(x => x.href)"), s.page.locator("#jv-continue").count())
+            s.page.evaluate("document.getElementById('jv-apply').click()")
+            out[jid] += (s.page.locator("#jv-review").count(),)
+            close_esc(s)
+        bad = {k: v for k, v in out.items() if not (v[0] == "true" and v[1] and v[2] == [] and v[3] == 0 and v[4] == 0)}
+        unit = s.page.evaluate("""() => { const J = NexoraJobs; return [
+            J.applyDestination({status:'UNVERIFIED', applyUrl:'javascript:alert(1)'}).kind, J.applyDestination({status:'UNVERIFIED', applyUrl:'data:text/html,x'}).kind,
+            J.applyDestination({status:'UNVERIFIED', applyUrl:'ftp://a.com/x'}).kind, J.applyDestination({status:'UNVERIFIED', applyUrl:'//evil.com'}).kind,
+            J.applyDestination({status:'UNVERIFIED', applyUrl:'https://a.com@evil.com'}).kind, J.applyDestination({status:'UNVERIFIED', applyUrl:'https://user:pw@evil.com'}).kind,
+            J.applyDestination({status:'UNVERIFIED', applyUrl:' JAVASCRIPT:alert(1)'}).kind, J.applyDestination({status:'UNVERIFIED', applyUrl:'https://'}).kind,
+            J.applyDestination({status:'UNVERIFIED', applyUrl:'https://www.Example.com/a'}).host, J.applyDestination({status:'VERIFIED', applyUrl:'https://ok.com/a'}).kind,
+            J.applyDestination({status:'UNVERIFIED', applyUrl:'http://ok.com/a'}).secure, J.applyDestination({status:'DEMO', applyUrl:'https://ok.com'}).kind ] }""")
+        want = ["none"] * 8 + ["example.com", "external-verified", False, "demo"]
+        x = s.page.evaluate("window.__xss")
+        return (not bad and unit == want and x is None) or (bad, unit, x)
+    check("S13-19 Unsafe URLs rejected (javascript:, data:, ftp:, //host, embedded credentials, malformed); DEMO never redirects", t_unsafe)
+    def t_external_not_submitted():
+        s.page.evaluate("localStorage.clear()")
+        before = len(apps_store(s))
+        open_job(s, 1); s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-review")
+        with s.ctx.expect_page() as pi:
+            s.page.click("#jv-continue")
+        pop = pi.value; pop.wait_for_load_state()
+        opener = pop.evaluate("window.opener"); purl = pop.url
+        s.page.wait_for_timeout(150)
+        recs = apps_store(s); st = s.page.inner_text("#jv-status"); label = s.page.inner_text("#jv-continue-label"); alltext = dlg_text(s) + s.page.inner_text("body")
+        pop.close()
+        ok = (before == 0 and opener is None and purl == "https://jobs.example.org/apply?ref=nexora" and len(recs) == 1
+              and recs[0]["status"] == "EXTERNAL_REDIRECT_OPENED" and recs[0]["method"] == "external_redirect" and recs[0]["jobId"] == 1 and recs[0]["candidateId"] is None
+              and recs[0]["destinationHost"] == "jobs.example.org" and recs[0]["applicationId"].startswith("app_") and recs[0]["createdAt"]
+              and set(recs[0].keys()) == {"applicationId", "jobId", "candidateId", "createdAt", "method", "status", "destinationHost"}
+              and not any(r["status"] == "SUBMITTED" for r in recs)
+              and "not counted as an application" in st and "jobs.example.org" in st and label == "Open application website again"
+              and not re.search(r"submitted|you applied|application sent|applied successfully", alltext, re.I)
+              and s.page.evaluate("NexoraApplications.isSubmittedViaNexora(NexoraApplications.getStore().list()[0])") is False
+              and s.page.evaluate("Object.keys(localStorage)") in ([], ["nexora:demo-saved"]))
+        close_esc(s)
+        return ok or (before, opener, purl, recs, st, label)
+    check("S13-20 Continue opens the exact URL in a new tab with no opener; records only EXTERNAL_REDIRECT_OPENED (never Submitted); nothing persisted; no 'applied' claim", t_external_not_submitted)
+    def t_double_click():
+        n0 = len(apps_store(s)); pages0 = len(s.ctx.pages)
+        open_job(s, 5); s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-review")
+        s.page.wait_for_timeout(1600)
+        s.page.dblclick("#jv-continue"); s.page.wait_for_timeout(500)
+        pages = len(s.ctx.pages) - pages0; recs = len(apps_store(s)) - n0
+        for p in s.ctx.pages[1:]: p.close()
+        close_esc(s)
+        return (pages == 1 and recs == 1) or (pages, recs)
+    check("S13-21 A double click on Continue opens one tab and records one redirect", t_double_click)
+    def t_no_record_for_nonredirect():
+        n0 = len(apps_store(s))
+        open_job(s, 3); s.page.evaluate("document.getElementById('jv-apply').click()"); close_esc(s)
+        open_job(s, 4); s.page.click("#jv-apply"); close_esc(s)
+        open_job(s, 1); s.page.click("#jv-apply"); s.page.click("#jv-cancel"); close_esc(s)
+        return len(apps_store(s)) == n0 or len(apps_store(s)) - n0
+    check("S13-22 Demo, no-URL and cancelled flows create no application record", t_no_record_for_nonredirect)
+    def t_xss():
+        open_job(s, 10)
+        t = dlg_text(s); imgs = s.page.locator("#dialog img, #dialog script, #dialog b, #dialog i").count()
+        title_ok = "<b>Injected</b> Title" in s.page.inner_text("#jv-title") and "<script>" in t
+        s.page.click("#jv-apply"); s.page.wait_for_selector("#jv-review"); rev = s.page.inner_text("#jv-review"); rimgs = s.page.locator("#dialog img, #dialog script, #dialog b, #dialog i").count()
+        close_esc(s)
+        x = s.page.evaluate("window.__xss")
+        return (imgs == 0 and rimgs == 0 and title_ok and "<img" in rev and x is None) or (imgs, rimgs, title_ok, x)
+    check("S13-23 Injected HTML in title, company, skills and description is shown as plain text, never executed", t_xss)
+    check("S13-24 No JavaScript errors during injected-data flows", lambda: s.errors == [] or s.errors)
+    s.close()
+
+    # ---------- responsive
+    def t_responsive():
+        bad = []
+        for w, h in ((320, 640), (375, 800), (414, 800), (768, 900), (1024, 800), (1280, 900)):
+            s2 = with_data13(b, http_url, viewport=(w, h)); fake_external(s2.ctx)
+            for jid, flow in ((1, "details"), (1, "review"), (4, "demo"), (3, "details")):
+                s2.page.click("[data-view='%d']" % jid); s2.page.wait_for_selector("#dialog[open] #jv-title")
+                if flow == "review": s2.page.click("#jv-apply"); s2.page.wait_for_selector("#jv-review")
+                if flow == "demo": s2.page.click("#jv-apply"); s2.page.wait_for_selector("#jv-demo")
+                m = s2.page.evaluate("""() => { const d = document.getElementById('dialog'); const r = d.getBoundingClientRect();
+                    const small = [...d.querySelectorAll('button, a.btn')].filter(e => e.offsetParent && (e.getBoundingClientRect().height < 40 || e.getBoundingClientRect().width < 40)).map(e => e.id || e.className);
+                    const wide = [...d.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > r.right + 1).map(e => e.tagName + '.' + e.className).slice(0, 3);
+                    return { sw: d.scrollWidth, cw: d.clientWidth, inView: r.left >= 0 && r.right <= innerWidth && r.height <= innerHeight, docOver: document.documentElement.scrollWidth > document.documentElement.clientWidth, small, wide } }""")
+                if m["sw"] > m["cw"] or not m["inView"] or m["docOver"] or m["small"] or m["wide"]: bad.append((w, jid, flow, m))
+                s2.page.keyboard.press("Escape")
+            if s2.errors: bad.append((w, s2.errors))
+            s2.close()
+        return not bad or bad[:3]
+    check("S13-25 Dialog fits 320-1280 px: no horizontal overflow, inside viewport, tap targets >= 40px (details, review, demo views)", t_responsive)
+    def t_touch():
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)
+        def handler(route): route.fulfill(status=200, content_type="application/javascript", body=TEST_DATA_13)
+        pg = ctx.new_page(); pg.route("**/assets/js/data.js", handler); errs = []
+        pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.goto(http_url); pg.wait_for_selector("#opps-grid .opp")
+        pg.tap("[data-view='1']"); pg.wait_for_selector("#jv-title")
+        pg.tap("#jv-save"); sv = pg.get_attribute("#jv-save", "aria-pressed")
+        pg.tap("#jv-apply"); pg.wait_for_selector("#jv-review"); rv = pg.locator("#jv-continue").is_visible()
+        pg.tap("#jv-cancel"); pg.tap("#dialog-x"); closed = not pg.evaluate("document.getElementById('dialog').open")
+        card = pg.get_attribute("[data-save='1']", "aria-pressed")
+        ctx.close()
+        return (sv == "true" and rv and closed and card == "true" and not errs) or (sv, rv, closed, card, errs)
+    check("S13-26 Emulated touch phone: tap View details, Save, Apply, Cancel, Close", t_touch)
+
+    # ---------- unit checks for applications.js
+    s = Site(b)
+    def t_units():
+        r = s.page.evaluate("""() => { const A = NexoraApplications; return {
+          a: A.createRecord({jobId: 1, method: 'nexora', destinationHost: 'x.com'}),
+          b: A.createRecord({jobId: 1, method: 'external_redirect', destinationHost: 'x.com', isDemo: true}),
+          c: A.createRecord({jobId: 'x', method: 'external_redirect', destinationHost: 'x.com'}),
+          d: A.createRecord({jobId: 1, method: 'external_redirect'}),
+          e: A.createRecord({jobId: 1, method: 'weird', destinationHost: 'x.com'}),
+          f: A.createRecord(), g: A.createRecord({jobId: 1, method: 'external_redirect', destinationHost: 'x.com'}), h: A.createRecord({jobId: 1, method: 'external_redirect', destinationHost: 'x.com'}),
+          sub: [A.isSubmittedViaNexora(null), A.isSubmittedViaNexora({method: 'external_redirect', status: 'SUBMITTED'}), A.isSubmittedViaNexora({method: 'nexora', status: 'SUBMITTED'})],
+          empty: A.getStore().list().length, persistent: A.getStore().persistent } }""")
+        ok = (r["a"]["ok"] is False and "backend" in r["a"]["reason"] and r["b"]["ok"] is False and r["c"]["ok"] is False and r["d"]["ok"] is False and r["e"]["ok"] is False and r["f"]["ok"] is False
+              and r["g"]["ok"] and r["g"]["record"]["status"] == "EXTERNAL_REDIRECT_OPENED" and r["g"]["record"]["applicationId"] != r["h"]["record"]["applicationId"]
+              and r["sub"] == [False, False, True] and r["empty"] == 0 and r["persistent"] is False)
+        return ok or r
+    check("S13-27 applications.js: refuses nexora/demo/invalid records, unique ids, redirect never 'Submitted', in-memory store", t_units)
+    def t_paragraph_units():
+        r = s.page.evaluate("""() => [NexoraJobs.paragraphs('a\\n\\nb\\r\\n\\r\\n  c  '), NexoraJobs.paragraphs(null), NexoraJobs.paragraphs(5), NexoraJobs.paragraphs('   ')]""")
+        return r == [["a", "b", "c"], [], [], []] or r
+    check("S13-28 paragraphs() splits long text safely and tolerates bad input", t_paragraph_units)
+    check("S13-29 applications.js ships with the project", lambda: os.path.isfile(os.path.join(ROOT, "assets/js/applications.js")) or "missing")
+    s.close()
+
 def main():
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     srv, http_url = start_server()
@@ -546,6 +966,7 @@ def main():
         if which in ("all", "core"): core(b)
         if which in ("all", "part2"):
             units(b); part2(b, http_url)
+        if which in ("all", "part3"): part3(b, http_url)
         b.close()
     srv.shutdown()
     out = os.path.join(ROOT, "tests", "results.json")

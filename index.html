@@ -38,6 +38,7 @@
     <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></symbol>
   </svg>
@@ -260,16 +261,20 @@
   </footer>
 
   <dialog class="dialog" id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-body">
+    <button class="dialog__x" type="button" id="dialog-x" aria-label="Close" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     <h2 id="dialog-title"></h2>
     <p class="dialog__meta" id="dialog-meta" hidden></p>
     <p id="dialog-body"></p>
     <div class="dialog__links" id="dialog-links"></div>
     <button class="btn btn--primary" type="button" id="dialog-close">Got it</button>
+    <!-- Job details and the apply flow (Step 1.3) are built here by main.js; text only, never HTML from data. -->
+    <div class="jv" id="dialog-job" hidden></div>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
 
   <script src="assets/js/data.js"></script>
   <script src="assets/js/jobs.js"></script>
+  <script src="assets/js/applications.js"></script>
   <script src="assets/js/main.js"></script>
 </body>
 </html>

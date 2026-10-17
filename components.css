@@ -155,3 +155,60 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; a
 .dialog .dialog__meta { margin-bottom: var(--space-3); font-weight: 600; color: var(--color-text); }
 .dialog__links { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); margin-bottom: var(--space-5); }
 .dialog__links:empty { display: none; }
+
+/* ---------- Job details and apply flow (Step 1.3). Uses existing tokens only. ---------- */
+body.is-modal { overflow: hidden; }
+.dialog__x {
+  position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1;
+  display: grid; place-items: center; width: var(--tap-size); height: var(--tap-size);
+  border: 0; border-radius: var(--radius-pill); background: none; color: var(--color-text-muted);
+  transition: background-color var(--ease), color var(--ease);
+}
+.dialog__x:hover { background: var(--color-sage); color: var(--color-primary); }
+.dialog--job { max-width: 40rem; max-height: calc(100dvh - 2rem); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.dialog--job .jv h2, .dialog--job .jv h3 { outline: none; }
+.dialog--job .jv p { margin-bottom: var(--space-3); }
+
+.jv { display: flex; flex-direction: column; gap: var(--space-5); }
+.jv__view { display: flex; flex-direction: column; gap: var(--space-5); }
+.jv__head { display: flex; align-items: center; gap: var(--space-3); padding-right: calc(var(--tap-size) + var(--space-2)); }
+.jv__mark {
+  flex: none; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--radius-md);
+  background: var(--color-mint); color: var(--color-primary); font-weight: 800;
+}
+.jv__head .badge { margin-top: 0.15rem; }
+.jv__title { font-size: var(--text-xl); }
+.jv__facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); font-size: var(--text-sm); color: var(--color-text-muted); }
+.jv__facts li { display: inline-flex; align-items: center; gap: 0.4rem; }
+.jv__facts .icon { width: 1rem; height: 1rem; }
+.jv__section h3 { font-size: var(--text-base); margin-bottom: var(--space-2); }
+.dialog .jv__section p { margin-bottom: var(--space-3); max-width: 65ch; line-height: var(--leading-body); }
+.dialog .jv__section p:last-child { margin-bottom: 0; }
+.jv__list { display: flex; flex-direction: column; gap: var(--space-2); padding-left: 1.1rem; list-style: disc; font-size: var(--text-sm); color: var(--color-text-muted); }
+.jv__list li::marker { color: var(--color-primary); }
+.dialog .jv__missing { font-size: var(--text-xs); }
+.jv__note {
+  padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);
+  background: var(--color-bg); font-size: var(--text-sm); color: var(--color-text);
+}
+.dialog .jv__note { margin-bottom: 0; color: var(--color-text); }
+.jv__note--caution { background: var(--color-sage); border-color: var(--color-primary); }
+.jv__note--demo { border-style: dashed; }
+.jv__note strong { font-weight: 700; }
+.jv__apply { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+.dialog .jv__apply p { margin-bottom: 0; }
+.jv__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.jv__actions .btn { white-space: normal; text-align: center; }
+.jv__save[aria-pressed="true"] { background: var(--color-mint); border-color: var(--color-primary); }
+.jv__save[aria-pressed="true"] .icon { fill: currentColor; }
+.jv__summary { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); margin: 0; }
+.jv__summary dt { color: var(--color-text-muted); font-weight: 600; }
+.jv__summary dd { margin: 0; font-weight: 600; }
+.jv__status { min-height: 0; font-size: var(--text-sm); color: var(--color-text); }
+.jv__status:empty { display: none; }
+.dialog .jv__status { margin: 0; padding: var(--space-3) var(--space-4); background: var(--color-mint); border-radius: var(--radius-md); }
+@media (max-width: 30rem) {
+  .jv__actions .btn { flex: 1 1 100%; }
+  .jv__summary { grid-template-columns: 1fr; gap: 0; }
+  .jv__summary dd { margin-bottom: var(--space-2); }
+}

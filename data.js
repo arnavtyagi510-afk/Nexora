@@ -1,4 +1,4 @@
-/* NEXORA job data (Step 1.2). DATA ONLY: no rendering or filtering logic lives here.
+/* NEXORA job data (Step 1.2, schema extended in Step 1.3). DATA ONLY: no rendering or filtering logic lives here.
 
    Every listing below is a fictional DEMO sample. None is live, verified, or accepting applications.
 
@@ -21,6 +21,12 @@
      status        "DEMO" | "UNVERIFIED" | "VERIFIED"  (VERIFIED needs evidenceUrl, otherwise it is downgraded)
      evidenceUrl   link proving verification, or null
      tags          optional search tags (the popular-search / category-card topics)
+
+   Optional fields read by the Step 1.3 details view (none exist in the shipped demo data; omit them when unknown):
+     responsibilities, qualifications, benefits   arrays of non-empty strings. Shown only when present.
+   description may contain several paragraphs separated by a blank line.
+   applyUrl is used only for UNVERIFIED / VERIFIED listings, only if it is a plain http(s) URL with a real host and no
+   embedded credentials, and only after the visitor confirms on the review step. DEMO listings never use it.
 
    Notes on how the current values were derived from the original Step 1 data:
      - category and tags classify the existing roles into the homepage's category cards.
