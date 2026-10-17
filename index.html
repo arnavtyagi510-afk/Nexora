@@ -37,6 +37,8 @@
     <symbol id="i-finance" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></symbol>
     <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></symbol>
   </svg>
 
@@ -61,7 +63,7 @@
       </div>
     </div>
 
-    <div class="mobile-menu" id="mobile-menu" hidden>
+    <div class="mobile-menu" id="mobile-menu" role="navigation" aria-label="Mobile" hidden>
       <div class="container">
         <a class="mobile-menu__link" href="#opportunities">Opportunities</a>
         <a class="mobile-menu__link" href="#opportunities" data-filter-link="Internship">Internships</a>
@@ -88,19 +90,21 @@
             <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
             <label class="sr-only" for="search-keyword">Job title, skills, or company</label>
             <input class="input" id="search-keyword" name="keyword" type="search" placeholder="Job title, skills, or company" autocomplete="off">
+            <button class="search__clear" type="button" id="search-clear" aria-label="Clear search" hidden><svg class="icon icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button>
           </div>
           <div class="search__field">
             <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>
             <label class="sr-only" for="search-location">Location</label>
-            <input class="input" id="search-location" name="location" type="text" placeholder="City or remote" autocomplete="off">
+            <input class="input" id="search-location" name="location" type="text" placeholder="City or remote" autocomplete="off" list="location-options">
+            <datalist id="location-options"></datalist>
           </div>
           <div class="search__field">
             <svg class="icon" aria-hidden="true"><use href="#i-briefcase"/></svg>
             <label class="sr-only" for="search-type">Opportunity type</label>
             <select class="select" id="search-type" name="type">
               <option value="all">Jobs &amp; internships</option>
-              <option value="job">Jobs</option>
-              <option value="internship">Internships</option>
+              <option value="Job">Jobs</option>
+              <option value="Internship">Internships</option>
             </select>
           </div>
           <button class="btn btn--primary btn--lg" type="submit">Search</button>
@@ -140,7 +144,24 @@
           <span><strong>Demo listings.</strong> These opportunities are sample data from fictional companies. They are not live, verified, or accepting applications.</span>
         </p>
 
-        <ul class="grid grid--opps" id="opps-grid" aria-live="polite"></ul>
+        <div class="filters" id="filters" role="group" aria-label="Filter and sort opportunities">
+          <div class="filters__grid">
+            <label class="filter" for="filter-type"><span class="filter__label">Type</span><select class="select" id="filter-type"></select></label>
+            <label class="filter" for="filter-mode"><span class="filter__label">Work mode</span><select class="select" id="filter-mode"></select></label>
+            <label class="filter" for="filter-category"><span class="filter__label">Category</span><select class="select" id="filter-category"></select></label>
+            <label class="filter" for="filter-experience"><span class="filter__label">Experience</span><select class="select" id="filter-experience"></select></label>
+            <label class="filter" for="sort-by"><span class="filter__label">Sort by</span><select class="select" id="sort-by"></select></label>
+          </div>
+          <p class="filters__note" id="filters-note"></p>
+          <div class="filters__bar">
+            <p class="results__count" id="results-count" role="status" aria-live="polite"></p>
+            <button class="chip chip--toggle" type="button" id="saved-toggle" aria-pressed="false"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-bookmark"/></svg><span id="saved-label">Saved (0)</span></button>
+            <ul class="filters__active" id="active-filters" aria-label="Active filters"></ul>
+            <button class="btn btn--text" type="button" id="clear-filters" hidden>Clear all filters</button>
+          </div>
+        </div>
+
+        <ul class="grid grid--opps" id="opps-grid" aria-label="Opportunities"></ul>
         <noscript><p class="section__note">JavaScript is needed to show the demo opportunities.</p></noscript>
       </div>
     </section>
@@ -238,14 +259,17 @@
     </div>
   </footer>
 
-  <dialog class="dialog" id="dialog" aria-labelledby="dialog-title">
+  <dialog class="dialog" id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-body">
     <h2 id="dialog-title"></h2>
+    <p class="dialog__meta" id="dialog-meta" hidden></p>
     <p id="dialog-body"></p>
+    <div class="dialog__links" id="dialog-links"></div>
     <button class="btn btn--primary" type="button" id="dialog-close">Got it</button>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
 
   <script src="assets/js/data.js"></script>
+  <script src="assets/js/jobs.js"></script>
   <script src="assets/js/main.js"></script>
 </body>
 </html>

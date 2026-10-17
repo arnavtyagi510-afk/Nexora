@@ -56,3 +56,6 @@ img, svg { display: block; max-width: 100%; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* Ensure the hidden attribute always wins over component display rules */
+[hidden] { display: none !important; }

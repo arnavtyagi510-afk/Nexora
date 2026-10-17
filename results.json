@@ -1,0 +1,242 @@
+[
+ {
+  "name": "01 Homepage loads without JavaScript errors",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "01b No failed network requests for local assets",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "02 Search by title",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "03 Search by company",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "04 Search by skill",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "05 Search by location (location box and keyword box)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "06 Enter submits a search",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "07 Clear search restores results",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "08 Each supported filter works (counts per value)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "09 Multiple filters combine correctly (incl. search + filters)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "10 Clear all filters resets all filter state",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "11 Sorting works where supported (Title A-Z; newest/pay disabled, no data)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "12 Result counts remain accurate (singular/plural, zero)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "13 Empty state appears for zero matches, Clear all recovers",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "14 Bookmarks toggle on and off",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "15 Bookmarks persist after refresh (add and remove)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "16 Existing navigation intact (nav links, Soon dialogs, category cards)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "16b Mobile menu opens and closes (button, Escape)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "17 No horizontal overflow at 320/375/414/768/1024/1280 px",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "18 Design preserved: ivory bg, forest-green primary, font stack, header/footer/sections",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "18b All required asset files present",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-26 Remote listing shows 'Remote' once (location duplicate suppressed)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-25 Pure helpers: formatSalary/formatDate/isPast/safeUrl/saved filter/cleanSavedIds",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-01 Shipped demo cards: DEMO badge, type, mode; no invented pay/dates/status",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-02 Experience shown only when known (Entry-level shown; unknown not shown)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-03 View details dialog: honest DEMO text, no apply link, focus returns to button",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-04 Status badges follow evidence: VERIFIED needs evidenceUrl, else shown Unverified; DEMO stays Demo",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-05 Compensation, experience, employment type and dates appear only when known; past deadline flagged",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-06 Injected HTML/javascript: URLs in data are escaped/ignored",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-07 Dialog links: apply/evidence only for non-DEMO listings that have them; external links use rel=noopener; no 'submitted' claims",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-08 Saved-only view: count label, filters combine, unbookmarking updates list, Clear all resets",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-09 Saved-only with nothing saved shows an honest empty state",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-10 Bookmark button: stable accessible name + aria-pressed, focus kept after toggle",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-11 localStorage holds a plain id array under nexora:demo-saved",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-12 Corrupted / odd stored bookmark data is ignored safely (no errors, valid ids only)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-13 Storage blocked: no errors, bookmarks work for the visit, user is told they won't persist",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-14 Storage write fails (quota): no errors, state kept in memory, user told",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-15 Bookmark changes in another tab are reflected (storage event)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-16 Every button, link, input and select has an accessible name",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-17 Search and filter controls have programmatic labels",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-18 Visible focus indicator (>=2px outline on element or its field wrapper) on key controls",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-19 Keyboard: search, filters, bookmark and details buttons reachable with Tab",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-20 Keyboard: Enter/Space toggle bookmark, Enter opens details, Escape closes",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-21 Semantics: one h1/main, lang, unique ids, labelled navs, skip link, live regions",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-22 Colour contrast of design-token pairs >= 4.5:1 (WCAG AA)",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-23 Card and search action buttons are at least 40px in both dimensions",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-27 Emulated touch phone (390px): tap bookmark, details, menu, saved view; no overflow/errors",
+  "status": "PASS",
+  "detail": ""
+ },
+ {
+  "name": "P2-24 Page still runs with no JS errors when optional elements are missing (15 variants)",
+  "status": "PASS",
+  "detail": ""
+ }
+]
