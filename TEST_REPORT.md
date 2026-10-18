@@ -1,6 +1,32 @@
 # NEXORA — Test Report
 
-# Phase 4, Step 4.2 — Project Defense & Skill Proof System
+# Phase 4, Step 4.3 — Skill Gap Analyzer & Personalized Learning Roadmap
+
+### Integrated-browser checks performed
+
+Ran on the local `file://` page using temporary browser storage fixtures; previous values for student profile, recruiter listings, and demo session were restored afterward.
+
+- Selected a custom generic role and edited the role template. Verified case-insensitive name matching, missing skills, separate project-linked and self-declared matches, generated practice steps, and the visible formula. A fixture with three unique matches among four target skills displayed 75%.
+- Selected a published recruiter-created listing from the target-job selector. Confirmed the analysis used the listing's actual saved skill list and displayed its recorded eligibility separately; a two-of-two fixture showed 100% coverage.
+- Checked roadmap completion and refresh persistence; edited a step, added a custom step, saved, and confirmed edits remained after reload.
+- Selected a listing with no skill requirements; the analyzer showed no percentage and an incomplete-data explanation. An empty profile showed 0% for a populated generic template and stated that saved skills/profile data were absent.
+- Verified an existing project-linked skill and completed Project Defense session remained intact and the UI did not call a completed assessment independent verification.
+- Compatibility browser checks confirmed the analyzer preserved saved application, project, and defense records; left the existing bookmark store unchanged; and the student application tracker plus recruiter applicant association still rendered.
+- Confirmed roadmap-reset cancellation preserved data and confirming reset cleared the analysis while retaining the profile record.
+- At 390px viewport, confirmed document width matched viewport width; no horizontal overflow.
+
+### Static and automated checks
+
+- `node --check assets\\js\\main.js` — PASS.
+- Python standard-library HTML parser — PASS; 350 IDs, no duplicates.
+- `python tests\\regression_test.py` — NOT RUN: could not start because Python Playwright is unavailable (`ModuleNotFoundError: No module named 'playwright'`).
+
+### Test iteration notes and remaining checks
+
+- Initial browser test assertions were corrected to reflect the exact target template and the requested name-match formula. A missing-skill empty-state rendering error was found and fixed; the roadmap editor also initially lost unsaved edits when adding a custom step, which was corrected and re-tested.
+- No physical-device, cross-browser, keyboard-only, or screen-reader testing was performed. Browser-local demo data does not sync between browsers/devices and is not a measure of proficiency or employability.
+
+## Phase 4, Step 4.2 — Project Defense & Skill Proof System
 
 ### Integrated-browser checks performed
 

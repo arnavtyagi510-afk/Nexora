@@ -709,6 +709,38 @@
     }).filter(function (session) { return session.questions.length > 0; }).slice(-30);
   }
 
+  function normalizeSkillGapAnalysis(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    var steps = Array.isArray(value.steps) ? value.steps.map(function (step, index) {
+      var item = step && typeof step === "object" && !Array.isArray(step) ? step : {};
+      return {
+        id: String(item.id || "roadmap_" + index).slice(0, 100),
+        skill: String(item.skill || "").trim().slice(0, 100),
+        why: String(item.why || "").trim().slice(0, 240),
+        exercise: String(item.exercise || "").trim().slice(0, 400),
+        projectId: String(item.projectId || "").trim().slice(0, 100),
+        completed: item.completed === true
+      };
+    }).filter(function (step) { return !!(step.skill && step.why && step.exercise); }).slice(0, 30) : [];
+    var requirements = Array.isArray(value.requiredSkills) ? value.requiredSkills.map(function (skill) {
+      return String(skill || "").trim().slice(0, 100);
+    }).filter(Boolean).slice(0, 40) : [];
+    var additionalRequirements = Array.isArray(value.additionalRequirements) ? value.additionalRequirements.map(function (item) {
+      return String(item || "").trim().slice(0, 300);
+    }).filter(Boolean).slice(0, 20) : [];
+    if (["role", "job"].indexOf(value.mode) < 0) return null;
+    return {
+      mode: value.mode,
+      role: String(value.role || "").trim().slice(0, 100),
+      jobId: String(value.jobId || "").slice(0, 100),
+      jobTitle: String(value.jobTitle || "").trim().slice(0, 160),
+      requiredSkills: requirements,
+      additionalRequirements: additionalRequirements,
+      analyzedAt: String(value.analyzedAt || "").slice(0, 40),
+      steps: steps
+    };
+  }
+
   function normalizeStudentProfile(profile) {
     var source = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {};
     var skills = Array.isArray(source.skills) ? source.skills.map(function (skill, index) {
@@ -776,6 +808,7 @@
       projects: projects,
       applications: applications,
       defenseSessions: normalizeDefenseSessions(source.defenseSessions),
+      skillGapAnalysis: normalizeSkillGapAnalysis(source.skillGapAnalysis),
       careerInterests: String(source.careerInterests || "").trim(),
       githubUrl: String(source.githubUrl || "").trim(),
       portfolioUrl: String(source.portfolioUrl || "").trim(),
@@ -787,7 +820,7 @@
 
   function studentProfileHasData(profile) {
     var p = normalizeStudentProfile(profile);
-    return !!(p.fullName || p.headline || p.educationLevel || p.collegeName || p.graduationYear || p.desiredRoles || p.opportunityType || p.workMode || p.preferredLocations || p.skills.length || p.projects.length || p.applications.length || p.careerInterests || p.githubUrl || p.portfolioUrl || p.email || p.role);
+    return !!(p.fullName || p.headline || p.educationLevel || p.collegeName || p.graduationYear || p.desiredRoles || p.opportunityType || p.workMode || p.preferredLocations || p.skills.length || p.projects.length || p.applications.length || p.skillGapAnalysis || p.careerInterests || p.githubUrl || p.portfolioUrl || p.email || p.role);
   }
 
   function setStudentStatus(message) {
@@ -1195,6 +1228,475 @@
     saveDefenseProfile(profile, "Session restarted. Answers cleared and session saved.");
   }
 
+  var skillGapTemplates = {
+    "Frontend Developer": ["HTML", "CSS", "JavaScript", "Responsive design", "Accessibility", "Git"],
+    "Backend Developer": ["Programming fundamentals", "API design", "Databases", "Authentication concepts", "Testing", "Git"],
+    "Full-Stack Developer": ["HTML", "CSS", "JavaScript", "API design", "Databases", "Testing", "Git"],
+    "Data Analyst": ["SQL", "Spreadsheets", "Data cleaning", "Data visualization", "Statistics", "Python"],
+    "AI/ML Engineer": ["Python", "Linear algebra", "Statistics", "Data preparation", "Machine learning fundamentals", "Model evaluation"],
+    "Cybersecurity Analyst": ["Networking fundamentals", "Linux", "Security fundamentals", "Log analysis", "Risk assessment", "Scripting"]
+  };
+  var skillGapRoadmapEditing = false;
+
+  function uniqueSkillNames(values) {
+    var seen = Object.create(null);
+    return values.map(function (value) { return String(value || "").trim(); }).filter(function (value) {
+      var key = value.toLowerCase().replace(/\s+/g, " ");
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  function skillGapJobs() {
+    return Array.isArray(allJobs) ? allJobs.filter(function (job) {
+      return job && job.title && job.company;
+    }) : [];
+  }
+
+  function updateSkillGapModeFields() {
+    var mode = document.getElementById("skill-gap-mode");
+    if (!mode) return;
+    var isJob = mode.value === "job";
+    document.getElementById("skill-gap-role-field").hidden = isJob;
+    document.getElementById("skill-gap-custom-field").hidden = isJob || document.getElementById("skill-gap-role").value !== "custom";
+    document.getElementById("skill-gap-job-field").hidden = !isJob;
+    document.getElementById("skill-gap-template-field").hidden = isJob;
+  }
+
+  function fillSkillGapJobOptions(selectedId) {
+    var select = document.getElementById("skill-gap-job");
+    if (!select) return;
+    var jobs = skillGapJobs();
+    select.innerHTML = '<option value="">Choose an active listing</option>' + jobs.map(function (job) {
+      return '<option value="' + escapeHtml(String(job.id)) + '">' + escapeHtml(job.title + " · " + job.company) + '</option>';
+    }).join("");
+    if (selectedId && jobs.some(function (job) { return String(job.id) === String(selectedId); })) select.value = String(selectedId);
+  }
+
+  function skillGapEvidenceForSkill(skill, profile) {
+    var project = skill.projectId ? profile.projects.find(function (item) { return item.id === skill.projectId; }) : null;
+    var hasProjectEvidence = skill.evidence === "project-linked";
+    var completedDefense = hasProjectEvidence && skill.projectId && profile.defenseSessions.some(function (session) {
+      return session.projectId === skill.projectId && session.status === "completed";
+    });
+    return {
+      kind: hasProjectEvidence ? "project-linked" : "self-declared",
+      project: project,
+      completedDefense: !!completedDefense
+    };
+  }
+
+  function roadmapExerciseForSkill(skillName, profile) {
+    var skillLower = skillName.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    var skillPattern = new RegExp("(^|[^a-z0-9])" + skillLower + "($|[^a-z0-9])", "i");
+    var project = profile.projects.find(function (item) {
+      var technologyMatches = item.technologies.split(/[,;|]/).some(function (technology) {
+        return technology.trim().toLowerCase() === skillName.toLowerCase();
+      });
+      return technologyMatches || skillPattern.test(item.title + " " + item.description);
+    });
+    if (project) {
+      return {
+        projectId: project.id,
+        text: "Extend “" + project.title + "” with a small feature that uses " + skillName + "; describe and test your contribution."
+      };
+    }
+    return {
+      projectId: "",
+      text: "Build a small, focused project that uses " + skillName + ", then document your design choice and how you checked the result."
+    };
+  }
+
+  function createSkillGapRoadmap(gaps, evidenceGaps, profile, targetName) {
+    var steps = [];
+    gaps.concat(evidenceGaps).forEach(function (skillName, index) {
+      if (steps.some(function (step) { return step.skill.toLowerCase() === skillName.toLowerCase(); })) return;
+      var exercise = roadmapExerciseForSkill(skillName, profile);
+      steps.push({
+        id: "roadmap_" + Date.now() + "_" + index + "_" + Math.random().toString(36).slice(2, 5),
+        skill: skillName,
+        why: gaps.some(function (gap) { return gap.toLowerCase() === skillName.toLowerCase(); })
+          ? skillName + " appears in the selected " + targetName + " skill requirements but is not in your saved skills."
+          : skillName + " matches the target but is currently self-declared without a project link.",
+        exercise: exercise.text,
+        projectId: exercise.projectId,
+        completed: false
+      });
+    });
+    return steps;
+  }
+
+  function analyzeSkillGaps() {
+    var mode = document.getElementById("skill-gap-mode").value;
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var targetName = "";
+    var targetJob = null;
+    var requiredSkills = [];
+    var additionalRequirements = [];
+    if (mode === "job") {
+      var selectedJobId = document.getElementById("skill-gap-job").value;
+      targetJob = skillGapJobs().find(function (job) { return String(job.id) === selectedJobId; }) || null;
+      if (!targetJob) {
+        document.getElementById("skill-gap-status").textContent = "Choose an available listing before analyzing its recorded requirements.";
+        return;
+      }
+      targetName = targetJob.title + " · " + targetJob.company;
+      requiredSkills = uniqueSkillNames(Array.isArray(targetJob.skills) ? targetJob.skills : []);
+      var qualifications = Array.isArray(targetJob.qualifications) ? targetJob.qualifications : [];
+      additionalRequirements = uniqueSkillNames(qualifications.concat(targetJob.eligibility || []));
+    } else {
+      var roleChoice = document.getElementById("skill-gap-role").value;
+      targetName = roleChoice === "custom" ? document.getElementById("skill-gap-custom-role").value.trim() : roleChoice;
+      if (!targetName) {
+        document.getElementById("skill-gap-status").textContent = "Enter a target role before analyzing its demo template.";
+        return;
+      }
+      requiredSkills = uniqueSkillNames(document.getElementById("skill-gap-template").value.split(","));
+    }
+    if (requiredSkills.length > 40) requiredSkills = requiredSkills.slice(0, 40);
+    var normalizedSkills = Object.create(null);
+    profile.skills.forEach(function (skill) {
+      var key = skill.name.toLowerCase().replace(/\s+/g, " ");
+      if (!normalizedSkills[key]) normalizedSkills[key] = skill;
+    });
+    var matching = [];
+    var missing = [];
+    var projectEvidence = [];
+    var moreEvidence = [];
+    requiredSkills.forEach(function (required) {
+      var skill = normalizedSkills[required.toLowerCase().replace(/\s+/g, " ")];
+      if (!skill) {
+        missing.push(required);
+        return;
+      }
+      matching.push({ requirement: required, skill: skill, evidence: skillGapEvidenceForSkill(skill, profile) });
+      if (skill.evidence === "project-linked") projectEvidence.push({ requirement: required, skill: skill, evidence: skillGapEvidenceForSkill(skill, profile) });
+      else moreEvidence.push({ requirement: required, skill: skill, evidence: skillGapEvidenceForSkill(skill, profile) });
+    });
+    var incomplete = [];
+    if (!profile.fullName || !profile.headline) incomplete.push("name or headline is missing");
+    if (!profile.skills.length) incomplete.push("no saved skills are available for comparison");
+    if (!profile.projects.length) incomplete.push("no projects are available for project-evidence suggestions");
+    if (mode === "job" && !requiredSkills.length) incomplete.push("the selected listing has no recorded skill requirements to compare");
+    if (mode === "role" && !requiredSkills.length) incomplete.push("the editable demo template has no skills");
+    var roadmap = createSkillGapRoadmap(missing, moreEvidence.map(function (item) { return item.requirement; }), profile, targetName);
+    var analysis = {
+      mode: mode,
+      role: mode === "role" ? targetName : "",
+      jobId: targetJob ? String(targetJob.id) : "",
+      jobTitle: targetJob ? targetJob.title : "",
+      requiredSkills: requiredSkills,
+      additionalRequirements: additionalRequirements,
+      analyzedAt: new Date().toISOString(),
+      steps: roadmap
+    };
+    var rawProfile = readDemoProfile();
+    rawProfile.skillGapAnalysis = analysis;
+    if (!writeDemoProfile(rawProfile)) {
+      document.getElementById("skill-gap-status").textContent = "Could not save this analysis in the browser. Check browser storage and try again.";
+      return;
+    }
+    skillGapRoadmapEditing = false;
+    renderSkillGapAnalysis(analysis, profile);
+    document.getElementById("skill-gap-status").textContent = "Analysis and a starting roadmap were saved in this browser. Matching uses skill names only.";
+  }
+
+  function renderSkillGapAnalysis(analysis, profile) {
+    var resultPanel = document.getElementById("skill-gap-results");
+    if (!resultPanel) return;
+    if (!analysis) {
+      resultPanel.hidden = true;
+      return;
+    }
+    var sourceProfile = profile || normalizeStudentProfile(readDemoProfile());
+    var jobs = skillGapJobs();
+    var targetJob = analysis.mode === "job" ? jobs.find(function (job) { return String(job.id) === analysis.jobId; }) : null;
+    var targetName = analysis.mode === "job"
+      ? (targetJob ? targetJob.title + " · " + targetJob.company : analysis.jobTitle || "Selected job")
+      : analysis.role;
+    var requiredSkills = analysis.requiredSkills;
+    var skillByName = Object.create(null);
+    sourceProfile.skills.forEach(function (skill) {
+      var key = skill.name.toLowerCase().replace(/\s+/g, " ");
+      if (!skillByName[key]) skillByName[key] = skill;
+    });
+    var matching = [];
+    var missing = [];
+    var projectEvidence = [];
+    var moreEvidence = [];
+    requiredSkills.forEach(function (required) {
+      var skill = skillByName[required.toLowerCase().replace(/\s+/g, " ")];
+      if (!skill) { missing.push(required); return; }
+      var evidence = skillGapEvidenceForSkill(skill, sourceProfile);
+      var row = { requirement: required, skill: skill, evidence: evidence };
+      matching.push(row);
+      if (evidence.kind === "project-linked") projectEvidence.push(row);
+      else moreEvidence.push(row);
+    });
+    var denominator = requiredSkills.length;
+    var readiness = denominator ? Math.round((matching.length / denominator) * 100) : null;
+    var incomplete = [];
+    if (!sourceProfile.fullName || !sourceProfile.headline) incomplete.push("some profile identity/headline fields are missing");
+    if (!sourceProfile.skills.length) incomplete.push("no saved skills were available");
+    if (!sourceProfile.projects.length) incomplete.push("no saved projects were available");
+    if (!denominator) incomplete.push("the target contains no recorded skills, so readiness cannot be calculated");
+    document.getElementById("skill-gap-results").hidden = false;
+    document.getElementById("skill-gap-summary-title").textContent = (analysis.mode === "job" ? "Job-specific analysis: " : "Generic role analysis: ") + (targetName || "Target role");
+    document.getElementById("skill-gap-readiness").textContent = readiness === null
+      ? "Readiness percentage: not available"
+      : "Name-match coverage: " + readiness + "%";
+    document.getElementById("skill-gap-readiness-method").textContent = denominator
+      ? "Formula: exact case-insensitive skill-name matches ÷ " + denominator + " unique target skills × 100 = " + matching.length + " ÷ " + denominator + " × 100. Self-declared and project-linked matches count equally. This is not a measure or guarantee of employability."
+      : "No percentage is shown because the target listing has no recorded skill list.";
+    document.getElementById("skill-gap-incomplete").textContent = incomplete.length
+      ? "Incomplete comparison: " + incomplete.join("; ") + "."
+      : "Comparison uses the profile data currently saved; missing profile fields are not inferred.";
+    function renderSkillRows(rows, emptyText, includeEvidence) {
+      if (!rows.length) return '<li class="empty--compact">' + escapeHtml(emptyText) + '</li>';
+      return rows.map(function (row) {
+        return '<li class="student-item"><strong>' + escapeHtml(row.requirement) + '</strong>' +
+          (includeEvidence ? (function () {
+            var evidence = row.evidence;
+            var detail = evidence.kind === "project-linked"
+              ? "Project-linked" + (evidence.project ? " · " + evidence.project.title : " · linked project not present")
+              : "Self-declared";
+            if (evidence.completedDefense) detail += " · Project Defense assessment completed (not independently verified)";
+            return '<span class="student-item__meta">Saved as ' + escapeHtml(row.skill.name) + ' · ' + escapeHtml(detail) + '</span>';
+          })() : '') +
+          '</li>';
+      }).join("");
+    }
+    document.getElementById("skill-gap-matching").innerHTML = renderSkillRows(matching, "No target skills match saved skill names.", true);
+    document.getElementById("skill-gap-missing").innerHTML = renderSkillRows(missing.map(function (skill) { return { requirement: skill }; }), "No missing target skills by name.", false);
+    document.getElementById("skill-gap-evidence").innerHTML = renderSkillRows(projectEvidence, "No matched target skills are currently project-linked.", true);
+    document.getElementById("skill-gap-more-evidence").innerHTML = renderSkillRows(moreEvidence, "No matched skills are currently classified as self-declared.", true);
+    var additional = analysis.additionalRequirements.length
+      ? "Other recorded job requirements (shown separately; not scored as skills): " + analysis.additionalRequirements.join(" · ")
+      : analysis.mode === "job" ? "This listing has no additional eligibility/qualification text recorded." : "Generic role template; no separate job requirements apply.";
+    document.getElementById("skill-gap-additional-requirements").textContent = additional;
+    fillSkillGapJobOptions(analysis.mode === "job" ? analysis.jobId : "");
+    document.getElementById("skill-gap-mode").value = analysis.mode;
+    document.getElementById("skill-gap-role").value = Object.prototype.hasOwnProperty.call(skillGapTemplates, analysis.role) ? analysis.role : "custom";
+    document.getElementById("skill-gap-custom-role").value = document.getElementById("skill-gap-role").value === "custom" ? analysis.role : "";
+    document.getElementById("skill-gap-template").value = analysis.mode === "role" ? analysis.requiredSkills.join(", ") : "";
+    updateSkillGapModeFields();
+    renderSkillGapRoadmap(analysis);
+  }
+
+  function renderSkillGapRoadmap(analysis) {
+    var list = document.getElementById("skill-gap-roadmap-list");
+    if (!list) return;
+    var steps = analysis.steps || [];
+    document.getElementById("skill-gap-roadmap-empty").hidden = steps.length > 0;
+    list.innerHTML = steps.map(function (step, index) {
+      if (skillGapRoadmapEditing) {
+        return '<li class="roadmap-step roadmap-step--editing" data-roadmap-id="' + escapeHtml(step.id) + '">' +
+          '<label class="roadmap-step__complete"><input type="checkbox" data-roadmap-complete="' + escapeHtml(step.id) + '"' + (step.completed ? ' checked' : '') + '> Completed</label>' +
+          '<div class="field-group"><label for="roadmap-skill-' + index + '">Skill/topic</label><input class="input" id="roadmap-skill-' + index + '" data-roadmap-skill value="' + escapeHtml(step.skill) + '" maxlength="100"></div>' +
+          '<div class="field-group"><label for="roadmap-why-' + index + '">Why it matters</label><input class="input" id="roadmap-why-' + index + '" data-roadmap-why value="' + escapeHtml(step.why) + '" maxlength="240"></div>' +
+          '<div class="field-group"><label for="roadmap-exercise-' + index + '">Practical exercise</label><input class="input" id="roadmap-exercise-' + index + '" data-roadmap-exercise value="' + escapeHtml(step.exercise) + '" maxlength="400"></div>' +
+          '<button class="btn btn--text" type="button" data-roadmap-delete="' + escapeHtml(step.id) + '">Remove step</button></li>';
+      }
+      var project = step.projectId ? normalizeStudentProfile(readDemoProfile()).projects.find(function (item) { return item.id === step.projectId; }) : null;
+      return '<li class="roadmap-step' + (step.completed ? ' is-complete' : '') + '">' +
+        '<label class="roadmap-step__complete"><input type="checkbox" data-roadmap-complete="' + escapeHtml(step.id) + '"' + (step.completed ? ' checked' : '') + '> Mark complete</label>' +
+        '<h5>' + escapeHtml(step.skill) + '</h5><p><strong>Why:</strong> ' + escapeHtml(step.why) + '</p>' +
+        '<p><strong>Exercise:</strong> ' + escapeHtml(step.exercise) + '</p>' +
+        (project ? '<p class="student-item__meta">Suggested existing project: ' + escapeHtml(project.title) + '</p>' : '') +
+        '</li>';
+    }).join("");
+    document.getElementById("skill-gap-edit-roadmap").disabled = skillGapRoadmapEditing;
+  }
+
+  function renderSkillGapAnalyzer() {
+    var roleSelect = document.getElementById("skill-gap-role");
+    var template = document.getElementById("skill-gap-template");
+    if (!roleSelect || !template) return;
+    fillSkillGapJobOptions();
+    var profile = normalizeStudentProfile(readDemoProfile());
+    if (profile.skillGapAnalysis) {
+      renderSkillGapAnalysis(profile.skillGapAnalysis, profile);
+      return;
+    }
+    template.value = (skillGapTemplates[roleSelect.value] || skillGapTemplates["Frontend Developer"]).join(", ");
+    document.getElementById("skill-gap-results").hidden = true;
+    updateSkillGapModeFields();
+  }
+
+  function saveSkillGapRoadmap(analysis) {
+    var profile = readDemoProfile();
+    var normalized = normalizeSkillGapAnalysis(analysis);
+    if (!normalized) return false;
+    profile.skillGapAnalysis = normalized;
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      document.getElementById("skill-gap-status").textContent = "Roadmap could not be saved in this browser. Check browser storage and try again.";
+      return false;
+    }
+    renderSkillGapAnalysis(normalized);
+    return true;
+  }
+
+  function readEditedRoadmapSteps(analysis) {
+    var rows = Array.prototype.slice.call(document.querySelectorAll("#skill-gap-roadmap-list .roadmap-step"));
+    var updated = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var skill = row.querySelector("[data-roadmap-skill]").value.trim();
+      var why = row.querySelector("[data-roadmap-why]").value.trim();
+      var exercise = row.querySelector("[data-roadmap-exercise]").value.trim();
+      if (!skill || !why || !exercise) {
+        document.getElementById("skill-gap-status").textContent = "Each roadmap step needs a topic, reason, and practical exercise.";
+        row.querySelector("[data-roadmap-skill]").focus();
+        return null;
+      }
+      var existing = analysis.steps.find(function (step) { return step.id === row.dataset.roadmapId; });
+      if (!existing) continue;
+      updated.push({
+        id: existing.id,
+        skill: skill,
+        why: why,
+        exercise: exercise,
+        projectId: existing.projectId,
+        completed: row.querySelector("[data-roadmap-complete]").checked
+      });
+    }
+    return updated;
+  }
+
+  function setRoadmapCompletion(stepId, complete) {
+    var profile = readDemoProfile();
+    var analysis = normalizeSkillGapAnalysis(profile.skillGapAnalysis);
+    if (!analysis) return;
+    var step = analysis.steps.find(function (item) { return item.id === stepId; });
+    if (!step) return;
+    step.completed = complete;
+    if (saveSkillGapRoadmap(analysis)) {
+      document.getElementById("skill-gap-status").textContent = "Roadmap progress saved in this browser.";
+    }
+  }
+
+  var skillGapModeSelect = document.getElementById("skill-gap-mode");
+  if (skillGapModeSelect) skillGapModeSelect.addEventListener("change", updateSkillGapModeFields);
+  var skillGapRoleSelect = document.getElementById("skill-gap-role");
+  if (skillGapRoleSelect) skillGapRoleSelect.addEventListener("change", function () {
+    var template = document.getElementById("skill-gap-template");
+    if (skillGapTemplates[skillGapRoleSelect.value] && template) template.value = skillGapTemplates[skillGapRoleSelect.value].join(", ");
+    updateSkillGapModeFields();
+  });
+  var skillGapAnalyzeButton = document.getElementById("skill-gap-analyze");
+  if (skillGapAnalyzeButton) skillGapAnalyzeButton.addEventListener("click", analyzeSkillGaps);
+  var skillGapEditButton = document.getElementById("skill-gap-edit-roadmap");
+  if (skillGapEditButton) skillGapEditButton.addEventListener("click", function () {
+    skillGapRoadmapEditing = true;
+    var editor = document.getElementById("skill-gap-roadmap-editor");
+    editor.hidden = false;
+    renderSkillGapRoadmap(normalizeStudentProfile(readDemoProfile()).skillGapAnalysis);
+  });
+  var skillGapCancelEditButton = document.getElementById("skill-gap-cancel-roadmap");
+  if (skillGapCancelEditButton) skillGapCancelEditButton.addEventListener("click", function () {
+    skillGapRoadmapEditing = false;
+    document.getElementById("skill-gap-roadmap-editor").hidden = true;
+    renderSkillGapAnalyzer();
+  });
+  var skillGapAddStepButton = document.getElementById("skill-gap-add-step");
+  if (skillGapAddStepButton) skillGapAddStepButton.addEventListener("click", function () {
+    var skill = document.getElementById("skill-gap-new-topic").value.trim();
+    var why = document.getElementById("skill-gap-new-why").value.trim();
+    var exercise = document.getElementById("skill-gap-new-exercise").value.trim();
+    if (!skill || !why || !exercise) {
+      document.getElementById("skill-gap-status").textContent = "Enter a topic, why it matters, and a practical exercise before adding a step.";
+      return;
+    }
+    var profile = readDemoProfile();
+    var analysis = normalizeSkillGapAnalysis(profile.skillGapAnalysis);
+    if (!analysis || analysis.steps.length >= 30) {
+      document.getElementById("skill-gap-status").textContent = analysis ? "A roadmap can contain at most 30 steps." : "Analyze a target before adding roadmap steps.";
+      return;
+    }
+    if (skillGapRoadmapEditing) {
+      var editedSteps = readEditedRoadmapSteps(analysis);
+      if (!editedSteps) return;
+      analysis.steps = editedSteps;
+    }
+    analysis.steps.push({
+      id: "roadmap_custom_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      skill: skill,
+      why: why,
+      exercise: exercise,
+      projectId: "",
+      completed: false
+    });
+    document.getElementById("skill-gap-new-topic").value = "";
+    document.getElementById("skill-gap-new-why").value = "";
+    document.getElementById("skill-gap-new-exercise").value = "";
+    profile.skillGapAnalysis = analysis;
+    if (!writeDemoProfile(profile)) {
+      document.getElementById("skill-gap-status").textContent = "Could not add the roadmap step. Check browser storage and try again.";
+      return;
+    }
+    renderSkillGapAnalyzer();
+    skillGapRoadmapEditing = true;
+    document.getElementById("skill-gap-roadmap-editor").hidden = false;
+    renderSkillGapRoadmap(normalizeStudentProfile(readDemoProfile()).skillGapAnalysis);
+    document.getElementById("skill-gap-status").textContent = "Custom roadmap step added. Save roadmap edits when finished.";
+  });
+  var skillGapSaveRoadmapButton = document.getElementById("skill-gap-save-roadmap");
+  if (skillGapSaveRoadmapButton) skillGapSaveRoadmapButton.addEventListener("click", function () {
+    var profile = readDemoProfile();
+    var analysis = normalizeSkillGapAnalysis(profile.skillGapAnalysis);
+    if (!analysis) return;
+    var updatedSteps = readEditedRoadmapSteps(analysis);
+    if (!updatedSteps) return;
+    analysis.steps = updatedSteps;
+    skillGapRoadmapEditing = false;
+    document.getElementById("skill-gap-roadmap-editor").hidden = true;
+    if (saveSkillGapRoadmap(analysis)) document.getElementById("skill-gap-status").textContent = "Roadmap edits saved in this browser.";
+  });
+  var skillGapResetRoadmapButton = document.getElementById("skill-gap-reset-roadmap");
+  if (skillGapResetRoadmapButton) skillGapResetRoadmapButton.addEventListener("click", function () {
+    if (!window.confirm("Reset this roadmap? This removes its steps and completion progress from this browser. You can analyze the target again to create a new roadmap.")) return;
+    var profile = readDemoProfile();
+    profile.skillGapAnalysis = null;
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      document.getElementById("skill-gap-status").textContent = "Roadmap could not be reset. Check browser storage and try again.";
+      return;
+    }
+    skillGapRoadmapEditing = false;
+    document.getElementById("skill-gap-roadmap-editor").hidden = true;
+    document.getElementById("skill-gap-status").textContent = "Roadmap reset. Choose a target and analyze again when ready.";
+    renderSkillGapAnalyzer();
+  });
+  document.addEventListener("change", function (event) {
+    var checkbox = event.target.closest("[data-roadmap-complete]");
+    if (!checkbox || skillGapRoadmapEditing) return;
+    setRoadmapCompletion(checkbox.dataset.roadmapComplete, checkbox.checked);
+  });
+  document.addEventListener("click", function (event) {
+    var removeStep = event.target.closest("[data-roadmap-delete]");
+    if (!removeStep) return;
+    var profile = readDemoProfile();
+    var analysis = normalizeSkillGapAnalysis(profile.skillGapAnalysis);
+    if (!analysis) return;
+    if (skillGapRoadmapEditing) {
+      var editedSteps = readEditedRoadmapSteps(analysis);
+      if (!editedSteps) return;
+      analysis.steps = editedSteps;
+    }
+    analysis.steps = analysis.steps.filter(function (step) { return step.id !== removeStep.dataset.roadmapDelete; });
+    profile.skillGapAnalysis = analysis;
+    if (!writeDemoProfile(profile)) {
+      document.getElementById("skill-gap-status").textContent = "Could not remove this roadmap step. Check browser storage and try again.";
+      return;
+    }
+    renderSkillGapAnalyzer();
+    skillGapRoadmapEditing = true;
+    document.getElementById("skill-gap-roadmap-editor").hidden = false;
+    renderSkillGapRoadmap(normalizeStudentProfile(readDemoProfile()).skillGapAnalysis);
+  });
+
   var defenseStartButton = document.getElementById("student-defense-start");
   if (defenseStartButton) defenseStartButton.addEventListener("click", function () {
     startStudentDefense(document.getElementById("student-defense-project").value);
@@ -1353,6 +1855,7 @@
           return '<dt>' + escapeHtml(entry[0]) + '</dt><dd>' + escapeHtml(entry[1]) + '</dd>';
         }).join("") + '</dl>';
     }
+    renderSkillGapAnalyzer();
     renderRecruiterApplicants(readRecruiterListings());
   }
 

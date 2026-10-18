@@ -350,6 +350,119 @@
             </div>
             <div id="student-profile-overview" class="student-overview"></div>
           </section>
+
+          <section class="student-card skill-gap-card" aria-labelledby="skill-gap-title">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Rule-based demo analysis</p>
+                <h3 id="skill-gap-title">Skill Gap Analyzer &amp; Learning Roadmap</h3>
+              </div>
+            </div>
+            <p class="recruiter-notice">This compares skill names saved in your profile with a generic editable demo template or the requirements recorded on a selected listing. It does not use AI, live job-market data, or independent skill verification.</p>
+            <div class="student-form-grid skill-gap-controls">
+              <div class="field-group">
+                <label for="skill-gap-mode">Analysis type</label>
+                <select class="select" id="skill-gap-mode">
+                  <option value="role">Generic career role</option>
+                  <option value="job">Specific NEXORA listing</option>
+                </select>
+              </div>
+              <div class="field-group" id="skill-gap-role-field">
+                <label for="skill-gap-role">Target career role</label>
+                <select class="select" id="skill-gap-role">
+                  <option value="Frontend Developer">Frontend Developer</option>
+                  <option value="Backend Developer">Backend Developer</option>
+                  <option value="Full-Stack Developer">Full-Stack Developer</option>
+                  <option value="Data Analyst">Data Analyst</option>
+                  <option value="AI/ML Engineer">AI/ML Engineer</option>
+                  <option value="Cybersecurity Analyst">Cybersecurity Analyst</option>
+                  <option value="custom">Custom role</option>
+                </select>
+              </div>
+              <div class="field-group" id="skill-gap-custom-field" hidden>
+                <label for="skill-gap-custom-role">Custom role name</label>
+                <input class="input" id="skill-gap-custom-role" maxlength="100" placeholder="Enter a target role">
+              </div>
+              <div class="field-group field-group--full" id="skill-gap-job-field" hidden>
+                <label for="skill-gap-job">Target job listing</label>
+                <select class="select" id="skill-gap-job">
+                  <option value="">Choose an active listing</option>
+                </select>
+              </div>
+              <div class="field-group field-group--full" id="skill-gap-template-field">
+                <label for="skill-gap-template">Demo skill template · editable, comma-separated</label>
+                <textarea class="input" id="skill-gap-template" rows="2" maxlength="1000" aria-describedby="skill-gap-template-help"></textarea>
+                <p class="student-item__meta" id="skill-gap-template-help">Edit this demo template before analysis. It is not an authoritative job-market requirement.</p>
+              </div>
+              <div class="field-group field-group--full">
+                <button class="btn btn--primary" type="button" id="skill-gap-analyze">Analyze skill gaps</button>
+              </div>
+            </div>
+            <p id="skill-gap-status" class="auth-status" role="status" aria-live="polite"></p>
+            <div id="skill-gap-results" class="skill-gap-results" hidden>
+              <div class="skill-gap-summary">
+                <h4 id="skill-gap-summary-title"></h4>
+                <p id="skill-gap-readiness"></p>
+                <p id="skill-gap-readiness-method" class="student-item__meta"></p>
+                <p id="skill-gap-incomplete" class="student-item__meta"></p>
+              </div>
+              <div class="skill-gap-columns">
+                <section>
+                  <h4>Matching skills</h4>
+                  <ul id="skill-gap-matching" class="student-list"></ul>
+                </section>
+                <section>
+                  <h4>Missing skills to practise</h4>
+                  <ul id="skill-gap-missing" class="student-list"></ul>
+                </section>
+                <section>
+                  <h4>Matched skills with project evidence</h4>
+                  <ul id="skill-gap-evidence" class="student-list"></ul>
+                </section>
+                <section>
+                  <h4>Matched skills that may need more evidence</h4>
+                  <ul id="skill-gap-more-evidence" class="student-list"></ul>
+                </section>
+              </div>
+              <p id="skill-gap-additional-requirements" class="student-item__meta"></p>
+              <p class="student-item__meta">Skill matching is name-based and uses your saved self-declared or project-linked entries. It does not establish proficiency or independent verification. Manage existing project-to-skill associations from your profile.</p>
+              <button class="btn btn--secondary" type="button" data-student-route="profile">Manage skills and projects</button>
+
+              <section class="roadmap-section" aria-labelledby="skill-gap-roadmap-title">
+                <div class="student-card__head">
+                  <div>
+                    <h4 id="skill-gap-roadmap-title">Personalized learning roadmap</h4>
+                    <p class="student-item__meta">Practical exercises generated from the current gaps; no courses, certificates, or external links are implied.</p>
+                  </div>
+                  <div class="roadmap-actions">
+                    <button class="btn btn--secondary" type="button" id="skill-gap-edit-roadmap">Edit roadmap</button>
+                    <button class="btn btn--text" type="button" id="skill-gap-reset-roadmap">Reset roadmap</button>
+                  </div>
+                </div>
+                <p id="skill-gap-roadmap-empty" class="empty--compact" hidden>No roadmap steps yet. Analyze a role or listing with missing or evidence-needed skills to create a starting roadmap.</p>
+                <ol id="skill-gap-roadmap-list" class="roadmap-list"></ol>
+                <div id="skill-gap-roadmap-editor" hidden>
+                  <div class="field-group">
+                    <label for="skill-gap-new-topic">Add a custom roadmap step (optional)</label>
+                    <input class="input" id="skill-gap-new-topic" maxlength="100" placeholder="Skill or topic">
+                  </div>
+                  <div class="field-group">
+                    <label for="skill-gap-new-why">Why it matters</label>
+                    <input class="input" id="skill-gap-new-why" maxlength="240" placeholder="Explain its relevance">
+                  </div>
+                  <div class="field-group">
+                    <label for="skill-gap-new-exercise">Practical exercise</label>
+                    <input class="input" id="skill-gap-new-exercise" maxlength="400" placeholder="Describe something you can build or practice">
+                  </div>
+                  <div class="student-form-controls student-form-controls--left">
+                    <button class="btn btn--secondary" type="button" id="skill-gap-add-step">Add step</button>
+                    <button class="btn btn--primary" type="button" id="skill-gap-save-roadmap">Save roadmap edits</button>
+                    <button class="btn btn--text" type="button" id="skill-gap-cancel-roadmap">Cancel</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
         </section>
 
         <section class="student-view" id="student-defense-view" hidden aria-labelledby="student-defense-title">

@@ -1,6 +1,16 @@
-# NEXORA — Phase 4, Step 4.2 (Project Defense)
+# NEXORA — Phase 4, Step 4.3 (Skill Gap Analyzer)
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 4.3 highlights
+
+- Added a student dashboard analyzer for generic career roles (Frontend Developer, Backend Developer, Full-Stack Developer, Data Analyst, AI/ML Engineer, Cybersecurity Analyst, or custom) and active NEXORA job listings.
+- Generic comparisons use editable, clearly labelled demo skill templates. Job-specific comparisons use the selected listing's recorded skill list and show its recorded qualifications separately; unrecorded requirements are not inferred.
+- Skill matching is exact after case/whitespace normalization. Matching includes both Self-declared and Project-linked profile skills; project evidence is shown separately, and completed Project Defense is only identified as an assessment completed, never as independent verification.
+- Name-match coverage uses `unique matching target skill names / unique recorded target skill names × 100`. It is an explanatory comparison ratio, not an ability or employability score. No percentage is displayed when the target provides no skill list.
+- The ordered roadmap creates practical exercises for missing skills and evidence gaps; existing projects are suggested when their saved fields mention the skill. Students can check progress, edit/remove steps, add custom steps, or reset the roadmap after confirmation.
+- The analysis and roadmap are stored in `nexora:demo-profile` alongside existing skills, projects, applications, and Project Defense sessions. No extra storage key, AI service, live market data, course links, or dependency was introduced.
+- This is a rule-based browser-local demo; there is no backend or AI analysis, job-market feed, independent skill verification, or cross-device progress sync.
 
 ## Phase 4.2 highlights
 

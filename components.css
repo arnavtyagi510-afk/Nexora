@@ -229,6 +229,28 @@
   background: var(--color-surface); border: 1px solid var(--color-border);
 }
 .student-item__meta { color: var(--color-text-muted); font-size: var(--text-sm); }
+.skill-gap-card { margin-top: var(--space-4); }
+.skill-gap-controls { margin-bottom: var(--space-3); }
+.skill-gap-controls textarea { min-height: 5rem; padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); }
+.skill-gap-controls .input:not(textarea) { min-height: var(--tap-size); padding-inline: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.skill-gap-results { margin-top: var(--space-4); }
+.skill-gap-summary { padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-mint); overflow-wrap: anywhere; }
+.skill-gap-summary h4, .skill-gap-summary p { margin: 0; }
+.skill-gap-summary p + p { margin-top: var(--space-2); }
+.skill-gap-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-4); }
+.skill-gap-columns h4 { margin-bottom: var(--space-2); }
+.roadmap-section { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.roadmap-section h4 { margin: 0; }
+.roadmap-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.roadmap-list { display: grid; gap: var(--space-3); margin: 0; padding-left: 1.5rem; }
+.roadmap-step { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow-wrap: anywhere; }
+.roadmap-step h5 { margin: var(--space-2) 0; font-size: var(--text-base); }
+.roadmap-step p { margin-top: var(--space-2); }
+.roadmap-step.is-complete { border-color: var(--color-primary); background: var(--color-mint); }
+.roadmap-step__complete { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 700; }
+.roadmap-step__complete input { accent-color: var(--color-primary); }
+.roadmap-step--editing { display: grid; gap: var(--space-3); }
+.roadmap-step--editing .input { min-height: var(--tap-size); padding-inline: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg); }
 .student-overview dl {
   display: grid; grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0;
 }
@@ -523,6 +545,10 @@ body.is-modal { overflow: hidden; }
   .student-project-item__actions { width: 100%; flex-wrap: wrap; }
   .student-project-item__actions .btn { flex: 1 1 auto; }
   .defense-history-item { align-items: flex-start; flex-direction: column; }
+  .skill-gap-columns { grid-template-columns: minmax(0, 1fr); }
+  .roadmap-section .student-card__head { align-items: flex-start; flex-direction: column; }
+  .roadmap-actions { width: 100%; }
+  .roadmap-actions .btn { flex: 1 1 auto; }
   #student-profile-nudge { align-items: flex-start; flex-direction: column; }
   .recruiter-applicant__controls .field-group { flex-basis: 100%; }
 }
