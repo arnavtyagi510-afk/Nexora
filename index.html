@@ -247,7 +247,7 @@
               <div class="field-group">
                 <label>Skills</label>
                 <div class="skill-adder">
-                  <input class="input" id="onboarding-skill-input" type="text" placeholder="Add a skill and press Enter">
+                  <input class="input" id="onboarding-skill-input" type="text" placeholder="Add a skill and press Enter" aria-label="Add a skill">
                   <button class="btn btn--secondary" type="button" id="onboarding-skill-add">Add skill</button>
                 </div>
                 <ul class="skill-list" id="onboarding-skill-list" aria-live="polite"></ul>
@@ -634,7 +634,7 @@
                 <button class="btn btn--primary" type="submit" id="student-application-save">Save application</button>
               </div>
               <p class="auth-status" id="student-application-message" role="status" aria-live="polite"></p>
-              <button class="btn btn--text" type="button" id="student-application-duplicate-edit" hidden></button>
+              <button class="btn btn--text" type="button" id="student-application-duplicate-edit" aria-label="Edit duplicate application" hidden></button>
             </form>
             <div class="student-application-filters">
               <div class="field-group">
@@ -783,7 +783,7 @@
                       <label for="student-skill-evidence-description">Project description or evidence summary</label>
                       <textarea class="input" id="student-skill-evidence-description" rows="3" placeholder="Describe the result, contribution, or proof of work for this skill."></textarea>
                     </div>
-                    <input type="hidden" id="student-skill-evidence-item" value="">
+                    <input type="hidden" id="student-skill-evidence-item" value="" aria-label="Skill evidence item id">
                   </div>
                   <div class="student-form-controls student-form-controls--left">
                     <button class="btn btn--secondary" type="button" id="student-skill-evidence-clear">Clear</button>

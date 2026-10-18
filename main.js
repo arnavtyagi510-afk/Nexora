@@ -640,6 +640,10 @@
   /* ---------- Student dashboard and profile foundation ---------- */
   var studentShell = document.getElementById("student-shell");
   var recruiterShell = document.getElementById("recruiter-shell");
+  var hiddenSections = [document.querySelector("main"), document.querySelector(".site-header"), document.querySelector(".site-footer")];
+  hiddenSections.forEach(function (node) {
+    if (node) node.hidden = false;
+  });
   var studentViews = $$(".student-view");
   var studentRouteButtons = $$("[data-student-route]");
   var studentProfileForm = document.getElementById("student-profile-form");
@@ -1681,12 +1685,12 @@
       ? "A repository link is listed (" + new URL(project.githubUrl).hostname + "); NEXORA has not inspected it."
       : "No repository link is listed.";
     return [
-      { category: "Project purpose and problem solved", text: "What problem did this project aim to solve, who was it for, and what outcome would make it successful? Use your saved summary (“" + description + (description.length >= 140 ? "…” : "") + "”) to frame the answer." },
-      { category: "Architecture", text: "Based on your project summary (“" + description + (description.length >= 140 ? "…” : "") + "”), how did you structure its main components and how do they work together?" },
+      { category: "Project purpose and problem solved", text: "What problem did this project aim to solve, who was it for, and what outcome would make it successful? Use your saved summary (\"" + description + (description.length >= 140 ? "…" : "") + "\") to frame the answer." },
+      { category: "Architecture", text: "Based on your project summary (\"" + description + (description.length >= 140 ? "…" : "") + "\"), how did you structure its main components and how do they work together?" },
       { category: "Implementation choices", text: "You listed " + technologies + ". Why were these technologies appropriate for this project, and what did you implement with them?" },
       { category: "Technical challenge", text: "What was a significant technical challenge in this project, and how did you approach solving it?" },
       { category: "Debugging", text: "Describe a bug or unexpected behavior you encountered, how you investigated it, and what evidence showed your fix worked. " + repoContext },
-      { category: "Individual contribution", text: "Your saved role is “" + role + "”. Which specific parts did you personally complete, and how would you explain your contribution to a reviewer?" }
+      { category: "Individual contribution", text: "Your saved role is \"" + role + "\". Which specific parts did you personally complete, and how would you explain your contribution to a reviewer?" }
     ];
   }
 
@@ -1978,7 +1982,7 @@
     if (project) {
       return {
         projectId: project.id,
-        text: "Extend “" + project.title + "” with a small feature that uses " + skillName + "; describe and test your contribution."
+        text: "Extend \"" + project.title + "\" with a small feature that uses " + skillName + "; describe and test your contribution."
       };
     }
     return {
@@ -5446,6 +5450,10 @@
   /* ---------- Opportunities: search, filters, sorting, bookmarks, rendering ---------- */
   var Jobs = window.NexoraJobs;
   var grid = $("#opps-grid");
+  if (grid) {
+    grid.hidden = false;
+    grid.removeAttribute("hidden");
+  }
   if (!grid) return;
   if (!Jobs) {
     grid.innerHTML = '<li class="empty"><h3>Opportunities could not load</h3><p>Please reload the page.</p></li>';
@@ -5680,8 +5688,8 @@
 
   function announceSearch(n) {
     var parts = [];
-    if (state.q) parts.push("“" + state.q + "”");
-    if (state.location) parts.push("in “" + state.location + "”");
+    if (state.q) parts.push('"' + state.q + '"');
+    if (state.location) parts.push('in "' + state.location + '"');
     statusEl.textContent = (parts.length ? plural(n) + " for " + parts.join(" ") : "Showing all " + n + " opportunities") + ". See results below.";
   }
 
