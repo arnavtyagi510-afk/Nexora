@@ -229,6 +229,25 @@
   background: var(--color-surface); border: 1px solid var(--color-border);
 }
 .student-item__meta { color: var(--color-text-muted); font-size: var(--text-sm); }
+.recommendation-card { margin-bottom: var(--space-4); }
+.recommendation-filters { margin-bottom: var(--space-3); }
+.recommendation-formula { color: var(--color-text-muted); font-size: var(--text-sm); }
+.recommendation-list { display: grid; gap: var(--space-3); }
+.recommendation-item { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.recommendation-item__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.recommendation-item__head h4 { margin: 0; }
+.recommendation-item__company { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+.recommendation-item__score { flex: 0 0 auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); background: var(--color-mint); color: var(--color-primary); font-weight: 700; }
+.recommendation-item__badges, .recommendation-item__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.recommendation-item__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.recommendation-item__facts section { min-width: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.recommendation-item__facts h5 { margin: 0 0 var(--space-1); font-size: var(--text-sm); }
+.recommendation-item__facts p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.recommendation-item__explanation { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.recommendation-item__actions .btn { min-height: var(--tap-size); }
+.recommendation-empty { padding: var(--space-4); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-bg); }
+.recommendation-empty h4 { margin: 0; }
+.recommendation-empty p { margin: var(--space-2) 0 0; color: var(--color-text-muted); }
 .skill-gap-card { margin-top: var(--space-4); }
 .skill-gap-controls { margin-bottom: var(--space-3); }
 .skill-gap-controls textarea { min-height: 5rem; padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); }
@@ -546,6 +565,10 @@ body.is-modal { overflow: hidden; }
   .student-project-item__actions .btn { flex: 1 1 auto; }
   .defense-history-item { align-items: flex-start; flex-direction: column; }
   .skill-gap-columns { grid-template-columns: minmax(0, 1fr); }
+  .recommendation-filters, .recommendation-item__facts { grid-template-columns: minmax(0, 1fr); }
+  .recommendation-item__head { flex-direction: column; }
+  .recommendation-item__score { flex: 0 0 auto; }
+  .recommendation-item__actions .btn { flex: 1 1 100%; }
   .roadmap-section .student-card__head { align-items: flex-start; flex-direction: column; }
   .roadmap-actions { width: 100%; }
   .roadmap-actions .btn { flex: 1 1 auto; }

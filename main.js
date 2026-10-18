@@ -1579,6 +1579,12 @@
 
   var skillGapModeSelect = document.getElementById("skill-gap-mode");
   if (skillGapModeSelect) skillGapModeSelect.addEventListener("change", updateSkillGapModeFields);
+  ["recommendation-type-filter", "recommendation-category-filter", "recommendation-source-filter", "recommendation-sort"].forEach(function (id) {
+    var filter = document.getElementById(id);
+    if (filter) filter.addEventListener("change", function () {
+      renderStudentRecommendations(normalizeStudentProfile(readDemoProfile()));
+    });
+  });
   var skillGapRoleSelect = document.getElementById("skill-gap-role");
   if (skillGapRoleSelect) skillGapRoleSelect.addEventListener("change", function () {
     var template = document.getElementById("skill-gap-template");
@@ -1789,6 +1795,246 @@
     }).join("");
   }
 
+  function recommendationWords(value) {
+    var ignored = {
+      a: true, an: true, and: true, for: true, in: true, of: true, the: true, to: true, with: true,
+      developer: true, engineer: true, analyst: true, associate: true, intern: true, internship: true,
+      junior: true, senior: true, entry: true, level: true, job: true
+    };
+    var seen = Object.create(null);
+    return String(value || "").toLowerCase().split(/[^a-z0-9+#.]+/).filter(function (word) {
+      if (!word || (word.length < 3 && ["ai", "ml", "ui", "ux"].indexOf(word) === -1) || ignored[word] || seen[word]) return false;
+      seen[word] = true;
+      return true;
+    });
+  }
+
+  function recommendationContainsPhrase(text, phrase) {
+    var escaped = String(phrase || "").toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    return !!escaped && new RegExp("(^|[^a-z0-9])" + escaped + "($|[^a-z0-9])", "i").test(String(text || ""));
+  }
+
+  function recommendationEligibility(job, profile) {
+    var recorded = [];
+    if (Array.isArray(job.qualifications)) recorded = recorded.concat(job.qualifications);
+    if (Array.isArray(job.eligibility)) recorded = recorded.concat(job.eligibility);
+    else if (typeof job.eligibility === "string") recorded.push(job.eligibility);
+    if (job.experience) recorded.push("Experience level: " + job.experience);
+    if (job.educationRequirement) recorded.push(String(job.educationRequirement));
+    var requirement = recorded.map(function (item) { return String(item || "").trim(); }).filter(Boolean).join(". ");
+    if (!requirement) {
+      return { status: "Unknown", explanation: "No eligibility or education requirement is recorded for this listing." };
+    }
+
+    var education = profile.educationLevel.toLowerCase();
+    var currentStudentRequirement = /\b(currently enrolled|currently studying|current student|students? (?:must|should|currently)|enrolled|pursuing)\b/i.test(requirement);
+    var needsPostgraduate = /\b(postgraduate|postgraduate degree|master(?:'s)? degree|ph\.?d\.?)\b/i.test(requirement);
+    var needsCompletedDegree = /\b(bachelor(?:'s)?(?: degree)?|b\.?tech|b\.?sc|b\.?e\.?|degree required|degree completed)\b/i.test(requirement);
+    var needsGraduate = /\bgraduate(?:s)? only\b/i.test(requirement);
+    var needsUndergraduate = /\bundergraduate(?:s)?\b/i.test(requirement);
+    var needsHighSchool = /\bhigh school\b/i.test(requirement);
+    var recognized = currentStudentRequirement || needsPostgraduate || needsCompletedDegree || needsGraduate || needsUndergraduate || needsHighSchool;
+    if (!recognized) {
+      return { status: "Unknown", explanation: "The listing records eligibility text, but the available profile fields cannot reliably assess it." };
+    }
+    if (/\b(experience|years?|age|citizenship|authorized|visa|language|relocat|work permit)\b/i.test(requirement)) {
+      return { status: "Unknown", explanation: "The listing includes eligibility criteria that the saved profile does not establish, so eligibility remains unknown." };
+    }
+
+    var hasEducation = !!education;
+    if (!hasEducation) {
+      return { status: "Unknown", explanation: "Eligibility mentions education, but no education level is saved in the profile." };
+    }
+    if (education === "working professional") {
+      return { status: "Unknown", explanation: "The saved Working professional level does not establish a specific degree or current enrollment status." };
+    }
+    var educationMatches = true;
+    if (needsPostgraduate) educationMatches = education === "postgraduate";
+    else if (needsCompletedDegree && !currentStudentRequirement || needsGraduate) educationMatches = education === "graduate" || education === "postgraduate";
+    else if (needsUndergraduate) educationMatches = education === "undergraduate";
+    else if (needsHighSchool) educationMatches = education === "high school";
+    if (currentStudentRequirement) {
+      var studentLevel = education === "high school" || education === "undergraduate";
+      if (education === "undergraduate" && !profile.collegeName) {
+        return { status: "Unknown", explanation: "The profile says Undergraduate but does not record a college, so current enrollment cannot be confirmed." };
+      }
+      educationMatches = educationMatches && studentLevel;
+    }
+    return educationMatches
+      ? { status: "Satisfied", explanation: "The saved education level is consistent with the recorded education criterion; this is not an employer eligibility decision." }
+      : { status: "Unmet", explanation: "The saved education level does not match the recorded education criterion. Confirm the listing details with the employer." };
+  }
+
+  function scoreRecommendedJob(job, profile) {
+    var requiredSkills = uniqueSkillNames(Array.isArray(job.skills) ? job.skills : []);
+    var savedSkills = Object.create(null);
+    profile.skills.forEach(function (skill) {
+      savedSkills[skill.name.toLowerCase().replace(/\s+/g, " ")] = skill;
+    });
+    var matchingSkills = requiredSkills.filter(function (skill) {
+      return !!savedSkills[skill.toLowerCase().replace(/\s+/g, " ")];
+    });
+    var missingSkills = requiredSkills.filter(function (skill) {
+      return !savedSkills[skill.toLowerCase().replace(/\s+/g, " ")];
+    });
+
+    var titleTerms = recommendationWords(job.title + " " + (job.category || ""));
+    var projectEvidence = profile.projects.filter(function (project) {
+      var projectText = [project.title, project.description, project.technologies, project.role].join(" ").toLowerCase();
+      return requiredSkills.length
+        ? requiredSkills.some(function (skill) { return recommendationContainsPhrase(projectText, skill); })
+        : titleTerms.some(function (term) { return recommendationContainsPhrase(projectText, term); });
+    });
+    var skillPoints = requiredSkills.length ? 50 * matchingSkills.length / requiredSkills.length : 0;
+    var projectPoints = Math.min(projectEvidence.length, 2) * 10;
+
+    var eligibility = recommendationEligibility(job, profile);
+    var eligibilityPoints = eligibility.status === "Satisfied" ? 20 : 0;
+
+    var preferredText = [profile.desiredRoles, profile.careerInterests, profile.headline].join(" ");
+    var preferredWords = recommendationWords(preferredText);
+    var jobWords = recommendationWords([job.title, job.category, (job.tags || []).join(" ")].join(" "));
+    var roleMatches = preferredWords.filter(function (word) { return jobWords.indexOf(word) !== -1; });
+    var rolePoints = preferredWords.length ? 4 * roleMatches.length / preferredWords.length : 0;
+    var opportunityTypes = [job.type, job.employmentType].filter(Boolean).map(function (type) { return type.toLowerCase(); });
+    var preferredTypes = String(profile.opportunityType || "").split(/[,;\n]/).map(function (type) { return type.trim().toLowerCase(); }).filter(Boolean);
+    var typeMatch = preferredTypes.some(function (type) { return opportunityTypes.indexOf(type) !== -1; });
+    var typePoints = preferredTypes.length && typeMatch ? 2 : 0;
+    var modeMatch = !!profile.workMode && String(profile.workMode).toLowerCase() === String(job.mode || "").toLowerCase();
+    var modePoints = profile.workMode && modeMatch ? 2 : 0;
+    var preferredLocations = String(profile.preferredLocations || "").split(/[,;\n]/).map(function (location) { return location.trim(); }).filter(Boolean);
+    var locationMatch = preferredLocations.some(function (location) {
+      return recommendationContainsPhrase(String(job.location || "").toLowerCase(), location.toLowerCase()) ||
+        (String(job.mode || "").toLowerCase() === "remote" && location.toLowerCase() === "remote");
+    });
+    var locationPoints = preferredLocations.length && locationMatch ? 2 : 0;
+    var preferencePoints = rolePoints + typePoints + modePoints + locationPoints;
+    var score = Math.max(0, Math.min(100, Math.round(skillPoints + projectPoints + eligibilityPoints + preferencePoints)));
+    var destination = Jobs.applyDestination(job);
+    var isDemo = job.status === "DEMO" || job.source === "recruiter-local-demo";
+    var hasExternalLink = destination.kind === "external" || destination.kind === "external-verified";
+    return {
+      job: job,
+      score: score,
+      matchingSkills: matchingSkills,
+      missingSkills: missingSkills,
+      projectEvidence: projectEvidence,
+      eligibility: eligibility,
+      eligibilityPoints: eligibilityPoints,
+      roleMatches: roleMatches,
+      rolePoints: rolePoints,
+      typePoints: typePoints,
+      modePoints: modePoints,
+      locationPoints: locationPoints,
+      preferencePoints: preferencePoints,
+      skillPoints: skillPoints,
+      projectPoints: projectPoints,
+      isDemo: isDemo,
+      hasExternalLink: hasExternalLink
+    };
+  }
+
+  function fillRecommendationFilters(jobs) {
+    var definitions = [
+      { id: "recommendation-type-filter", values: jobs.reduce(function (values, job) {
+        [job.type, job.employmentType].forEach(function (value) { if (value && values.indexOf(value) === -1) values.push(value); });
+        return values;
+      }, []), first: ["all", "All types"] },
+      { id: "recommendation-category-filter", values: jobs.reduce(function (values, job) {
+        if (job.category && values.indexOf(job.category) === -1) values.push(job.category);
+        return values;
+      }, []), first: ["all", "All categories"] }
+    ];
+    definitions.forEach(function (definition) {
+      var select = document.getElementById(definition.id);
+      if (!select) return;
+      var previous = select.value || "all";
+      select.textContent = "";
+      var first = document.createElement("option");
+      first.value = definition.first[0];
+      first.textContent = definition.first[1];
+      select.appendChild(first);
+      definition.values.sort().forEach(function (value) {
+        var option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+      select.value = definition.values.indexOf(previous) !== -1 ? previous : "all";
+    });
+  }
+
+  function recommendationPoints(value) {
+    return (Math.round(value * 10) / 10).toFixed(1);
+  }
+
+  function renderStudentRecommendations(profile) {
+    var list = document.getElementById("recommended-opportunities-list");
+    if (!list) return;
+    var jobs = Array.isArray(allJobs) ? allJobs.filter(function (job) { return job && job.title && job.company; }) : [];
+    fillRecommendationFilters(jobs);
+    var meaningfulProfileData = profile.skills.length || profile.projects.length || profile.desiredRoles ||
+      profile.careerInterests || profile.headline || profile.educationLevel || profile.collegeName;
+    if (!meaningfulProfileData) {
+      list.innerHTML = '<div class="recommendation-empty"><h4>Complete your profile to get useful recommendations</h4><p>Add skills, project details, education, desired roles, or career interests. We will not infer a match from a name alone.</p><button class="btn btn--secondary" type="button" data-student-route="profile">Complete profile</button></div>';
+      return;
+    }
+    if (!jobs.length) {
+      list.innerHTML = '<div class="recommendation-empty"><h4>No active listings to compare</h4><p>There are no current Job Explorer records available for recommendation.</p><button class="btn btn--secondary" type="button" data-student-route="explore">Explore jobs</button></div>';
+      return;
+    }
+    var typeFilter = document.getElementById("recommendation-type-filter").value;
+    var categoryFilter = document.getElementById("recommendation-category-filter").value;
+    var sourceFilter = document.getElementById("recommendation-source-filter").value;
+    var recommendations = jobs.map(function (job) { return scoreRecommendedJob(job, profile); }).filter(function (item) {
+      if (typeFilter !== "all" && item.job.type !== typeFilter && item.job.employmentType !== typeFilter) return false;
+      if (categoryFilter !== "all" && item.job.category !== categoryFilter) return false;
+      if (sourceFilter === "demo" && !item.isDemo) return false;
+      if (sourceFilter === "external" && !item.hasExternalLink) return false;
+      return true;
+    }).sort(function (a, b) {
+      return b.score - a.score || String(a.job.title).localeCompare(String(b.job.title));
+    });
+    if (!recommendations.length) {
+      list.innerHTML = '<div class="recommendation-empty"><h4>No opportunities match these filters</h4><p>Change the type, category, or listing filter to see other saved listings.</p></div>';
+      return;
+    }
+    list.innerHTML = recommendations.map(function (item) {
+      var job = item.job;
+      var savedId = Number(job.id);
+      var isSaved = saved.indexOf(savedId) !== -1;
+      var matchingText = item.matchingSkills.length ? item.matchingSkills.join(", ") : "None recorded";
+      var missingText = item.missingSkills.length ? item.missingSkills.join(", ") : (job.skills && job.skills.length ? "No listed skills missing by name" : "No skill requirements recorded");
+      var projectsText = item.projectEvidence.length
+        ? item.projectEvidence.map(function (project) { return project.title; }).join(", ")
+        : "No saved project clearly mentions a listed skill or role keyword.";
+      var eligibilityText = item.eligibility.status + " · " + item.eligibility.explanation;
+      var sourceBadge = (item.isDemo
+        ? '<span class="badge badge--demo">' + (job.source === "recruiter-local-demo" ? "Local recruiter DEMO listing" : "DEMO · fictional sample") + '</span>'
+        : "") + (item.hasExternalLink
+        ? '<span class="badge badge--outline">External application link recorded</span>'
+        : item.isDemo ? "" : '<span class="badge badge--outline">Listing · no usable external link</span>');
+      var roleExplanation = "Role/interests " + recommendationPoints(item.rolePoints) + "/4, opportunity type " + recommendationPoints(item.typePoints) + "/2, work mode " + recommendationPoints(item.modePoints) + "/2, preferred location " + recommendationPoints(item.locationPoints) + "/2 points. Missing preference details earn no points.";
+      var eligibilityScore = item.eligibilityPoints + "/20 points";
+      return '<article class="recommendation-item">' +
+        '<div class="recommendation-item__head"><div><h4>' + escapeHtml(job.title) + '</h4><p class="recommendation-item__company">' + escapeHtml(job.company) + ' · ' + escapeHtml(job.type || "Opportunity") + (job.category ? " · " + escapeHtml(job.category) : "") + '</p></div><span class="recommendation-item__score" aria-label="Rule-based match score ' + item.score + ' percent">' + item.score + '% match</span></div>' +
+        '<div class="recommendation-item__badges">' + sourceBadge + statusBadge(job) + '</div>' +
+        '<div class="recommendation-item__facts">' +
+          '<section><h5>Skills you match</h5><p>' + escapeHtml(matchingText) + '</p></section>' +
+          '<section><h5>Skills to build</h5><p>' + escapeHtml(missingText) + '</p></section>' +
+          '<section><h5>Relevant saved projects</h5><p>' + escapeHtml(projectsText) + '</p></section>' +
+          '<section><h5>Eligibility: ' + escapeHtml(item.eligibility.status) + '</h5><p>' + escapeHtml(eligibilityText) + '</p></section>' +
+        '</div>' +
+        '<p class="recommendation-item__explanation">Score details: skills ' + recommendationPoints(item.skillPoints) + '/50; project evidence ' + recommendationPoints(item.projectPoints) + '/20; eligibility ' + eligibilityScore + '; saved preference fit ' + recommendationPoints(item.preferencePoints) + '/10. Components are rounded to one decimal; the final percentage rounds the full score to the nearest integer. ' + escapeHtml(roleExplanation) + '</p>' +
+        '<div class="recommendation-item__actions">' +
+          '<button class="btn btn--secondary" type="button" data-rec-view="' + escapeHtml(String(job.id)) + '">View details</button>' +
+          '<button class="btn btn--secondary" type="button" data-rec-save="' + escapeHtml(String(job.id)) + '" aria-pressed="' + String(isSaved) + '">' + (isSaved ? "Remove saved job" : "Save job") + '<span class="sr-only">: ' + escapeHtml(job.title) + '</span></button>' +
+          '<button class="btn btn--text" type="button" data-rec-gap="' + escapeHtml(String(job.id)) + '">Compare skill gaps</button>' +
+        '</div>' +
+      '</article>';
+    }).join("");
+  }
+
   function renderStudentDashboard() {
     var profile = normalizeStudentProfile(readDemoProfile());
     var name = profile.fullName || "Student";
@@ -1855,6 +2101,7 @@
           return '<dt>' + escapeHtml(entry[0]) + '</dt><dd>' + escapeHtml(entry[1]) + '</dd>';
         }).join("") + '</dl>';
     }
+    renderStudentRecommendations(profile);
     renderSkillGapAnalyzer();
     renderRecruiterApplicants(readRecruiterListings());
   }
@@ -4209,6 +4456,37 @@
     } else if (viewBtn) {
       var o = allJobs.filter(function (x) { return x.id === Number(viewBtn.dataset.view); })[0];
       if (o) showDetails(o);
+    }
+  });
+
+  document.addEventListener("click", function (e) {
+    var target = e.target.closest("[data-rec-view], [data-rec-save], [data-rec-gap]");
+    if (!target) return;
+    var job = allJobs.find(function (item) { return String(item.id) === target.dataset.recView || String(item.id) === target.dataset.recSave || String(item.id) === target.dataset.recGap; });
+    if (!job) return;
+    if (target.hasAttribute("data-rec-view")) {
+      showDetails(job);
+    } else if (target.hasAttribute("data-rec-save")) {
+      var message = toggleSaved(Number(job.id), true);
+      if (state.saved) render();
+      else refreshSaveButtons();
+      var status = document.getElementById("recommendation-status");
+      if (status) status.textContent = message;
+      var updatedSaveButton = document.querySelector('[data-rec-save="' + String(job.id) + '"]');
+      if (updatedSaveButton) updatedSaveButton.focus({ preventScroll: true });
+    } else {
+      var mode = document.getElementById("skill-gap-mode");
+      var select = document.getElementById("skill-gap-job");
+      if (!mode || !select) return;
+      mode.value = "job";
+      updateSkillGapModeFields();
+      fillSkillGapJobOptions(String(job.id));
+      document.getElementById("skill-gap-status").textContent = "Selected " + job.title + " for job-specific skill-gap analysis. Choose Analyze to refresh the existing roadmap.";
+      var analyzer = document.getElementById("skill-gap-title");
+      if (analyzer) {
+        analyzer.scrollIntoView({ behavior: "smooth", block: "start" });
+        mode.focus({ preventScroll: true });
+      }
     }
   });
 

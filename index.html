@@ -343,6 +343,47 @@
 
           </div>
 
+          <section class="student-card recommendation-card" aria-labelledby="recommended-opportunities-title">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Transparent rule-based demo</p>
+                <h3 id="recommended-opportunities-title">Recommended Opportunities</h3>
+              </div>
+            </div>
+            <p class="recruiter-notice">Recommendations use only saved profile details and listings already in NEXORA. Match percentages are explainable comparisons, not AI, eligibility guarantees, or hiring predictions. Browser-local demo data is not synced across devices.</p>
+            <div class="student-form-grid recommendation-filters" aria-label="Recommendation filters">
+              <div class="field-group">
+                <label for="recommendation-type-filter">Opportunity type</label>
+                <select class="select" id="recommendation-type-filter">
+                  <option value="all">All types</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="recommendation-category-filter">Category</label>
+                <select class="select" id="recommendation-category-filter">
+                  <option value="all">All categories</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="recommendation-source-filter">Listing / application</label>
+                <select class="select" id="recommendation-source-filter">
+                  <option value="all">All listings</option>
+                  <option value="demo">DEMO listings</option>
+                  <option value="external">Listings with external application links</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="recommendation-sort">Sort recommendations</label>
+                <select class="select" id="recommendation-sort">
+                  <option value="match">Best match</option>
+                </select>
+              </div>
+            </div>
+            <p class="recommendation-formula">Formula: required-skill name match (50%) + relevant saved projects (20%) + explicitly assessable recorded eligibility (20%) + saved preference fit (10%, including role/headline/interests, opportunity type, work mode, and location). Unknown or missing information earns no points. No skill requirements means no skill-match points.</p>
+            <p id="recommendation-status" class="auth-status" role="status" aria-live="polite"></p>
+            <div id="recommended-opportunities-list" class="recommendation-list"></div>
+          </section>
+
           <section class="student-card">
             <div class="student-card__head">
               <h3>Profile Overview</h3>

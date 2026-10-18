@@ -1,6 +1,15 @@
-# NEXORA — Phase 4, Step 4.3 (Skill Gap Analyzer)
+# NEXORA — Phase 4, Step 4.4 (Transparent Job Matching)
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 4.4 highlights
+
+- Added **Recommended Opportunities** to the student dashboard using only currently available Job Explorer records and the saved student profile. Published recruiter-local listings are included as local DEMO data; expired, closed, draft, and unpublished records are not recommendations.
+- Each card displays matching and missing listed skills, relevant saved projects, conservative eligibility status (Satisfied / Unmet / Unknown), listing/demo and external-link labels, and an explanation of the score.
+- The deterministic score is clamped to 0–100 and calculated as: exact case/whitespace-normalized skill-name coverage × 50; relevant saved projects × 10 each, capped at 20; explicitly assessable eligibility = 20 only when satisfied (otherwise 0); and saved preference fit up to 10 (role/headline/interests overlap up to 4, plus 2 each for matching opportunity type, work mode, and location). Unknown experience/eligibility criteria are not inferred. Missing inputs earn no points, and jobs without recorded skill requirements receive no skill points. Component points display to one decimal; the final score rounds to an integer. This is a comparison heuristic, not an employability or selection measure.
+- Type and category filters are populated from available listings; students can filter DEMO listings or listings with external application links and recommendations are sorted best match first. Bookmark buttons reuse the existing `nexora:demo-saved` store, details use the existing job dialog, Apply Now uses the existing honest flow, and skill-gap buttons select a listing in the existing Step 4.3 analyzer without replacing its roadmap.
+- Recommendations update when the existing browser-local profile or listing data changes. No new storage key, dependency, external resource, company, vacancy, or application record was added.
+- This is a browser-local demo with no backend, AI model, live job-market feed, cross-device synchronization, or employer eligibility decision. An unknown or partial profile is not treated as a successful match.
 
 ## Phase 4.3 highlights
 
@@ -256,6 +265,7 @@ Bookmarks are stored with `localStorage` in the visitor's own browser, under the
 
 ## Known limitations
 
+- Recommended match percentages are transparent rule-based comparisons of saved data only. Eligibility is only assessed for a narrow, explicitly recorded education criterion that the profile can compare; other or incomplete criteria remain Unknown. Scores are not a guarantee of eligibility, hiring, or selection. Recommendation filter choices reset when the page reloads.
 - **All opportunities are demo data** from fictional companies. Nothing can be applied to, and no shipped listing has a salary, dates, description or application URL. The real-URL flow was tested with temporary test data (and a mocked external site), not with shipped data.
 - **NEXORA cannot submit applications or sync employer outcomes/responses.** The local tracker stores only student-entered notes and statuses in this browser. There is no backend, real login, or recruiter-to-student status connection.
 - "View details" is a dialog, not a separate page, and has no shareable URL.
