@@ -1357,6 +1357,35 @@
     </div>
   </footer>
 
+  <section class="admin-review-shell" id="demo-review-queue" hidden aria-labelledby="admin-review-title">
+    <div class="container admin-review-wrap">
+      <div class="student-card">
+        <div class="student-card__head">
+          <div>
+            <p class="student-banner__eyebrow">Separate demo reviewer view</p>
+            <h2 id="admin-review-title">Job &amp; Recruiter Reports</h2>
+          </div>
+          <button class="btn btn--secondary" type="button" id="admin-review-exit">Return to NEXORA</button>
+        </div>
+        <p class="recruiter-notice">This review queue is a browser-local demonstration, not an authenticated admin dashboard. Reports and status actions can be edited by anyone with access to this browser. No reviewer identity, investigation, notification, or real-world enforcement is provided.</p>
+        <p class="auth-status" id="admin-review-feedback" role="status" aria-live="polite"></p>
+        <div class="student-form-grid admin-review-filters">
+          <div class="field-group">
+            <label for="admin-review-status-filter">Filter by review status</label>
+            <select class="select" id="admin-review-status-filter">
+              <option value="all">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Under Review">Under Review</option>
+              <option value="Resolved">Resolved</option>
+              <option value="Dismissed">Dismissed</option>
+            </select>
+          </div>
+        </div>
+        <ul class="review-queue-list" id="admin-review-list" aria-live="polite"></ul>
+      </div>
+    </div>
+  </section>
+
   <dialog class="dialog" id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-body">
     <button class="dialog__x" type="button" id="dialog-x" aria-label="Close" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     <h2 id="dialog-title"></h2>

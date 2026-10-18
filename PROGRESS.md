@@ -1,5 +1,28 @@
 # NEXORA — Progress
 
+## Phase 5.3 — Fake Job/Recruiter Reports, Review Queue & Scam Warnings — STATUS: COMPLETE (browser-local demo scope)
+
+### Features implemented
+- Added Report Job actions to listing cards and job details, plus Report Recruiter in job details. The form supports the six requested report reasons, optional explanation, required-reason validation, local confirmation, and duplicate prevention by target/reason.
+- Extended the existing `nexora:demo-job-reports` store instead of adding a parallel report database. Existing Submitted records normalize to Pending; new records carry target/job/company context and timestamps.
+- Added a distinct `#demo-review-queue` demo route with Pending, Under Review, Resolved, and Dismissed filters; status changes update the shared local report data immediately. Resolve and Dismiss require confirmation.
+- Listing and detail warnings appear only while a matching report is Under Review. Warnings are non-accusatory, include safety advice, and are removed when the report is Resolved or Dismissed. Pending reports do not imply fraud.
+- The queue is intentionally not linked as a normal admin feature and clearly states that it is not authenticated or tamper-proof. It is not a production moderation workflow.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `assets/css/home.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated-browser checks — PASS for the exercised flows: initially empty review queue; required-reason validation; job report submission and duplicate rejection; recruiter report submission and duplicate rejection; Pending/Under Review/Resolved/Dismissed filters; Mark Under Review, Resolve, and Dismiss actions with their status feedback/confirmation; warning shown on listing/details while Under Review and absent after resolution; status persistence after reload; and 390px viewport layout without horizontal overflow.
+- `node --check assets\js\main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS; 363 IDs, none duplicated.
+- No build, lint, or type-check command is configured for this plain HTML/CSS/JavaScript project. The optional Python Playwright suite was not run in this validation.
+
+### Limitations and remaining manual checks
+- Reports and moderation statuses are browser-local and editable by anyone with access to that browser. There is no authenticated admin role, reviewer attribution, backend, real investigation, notification, enforcement, or cross-device sync.
+- A report marked Under Review is only a local workflow state, not a credibility determination. Production moderation requires an authorized review process and server-side persistence/permissions.
+- Physical-device, cross-browser, keyboard-only, and screen-reader checks remain manual.
+
 ## Phase 4, Step 4.4 — Transparent Job Matching & Recommendations — STATUS: COMPLETE (browser-local demo scope)
 
 ### Features implemented

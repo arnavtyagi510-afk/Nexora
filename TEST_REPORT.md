@@ -1,5 +1,30 @@
 # NEXORA — Test Report
 
+## Phase 5.3 — Job/recruiter reports, review queue, and warnings
+
+### Integrated-browser checks performed
+
+Checks used temporary browser-local test records. The original values for the six affected localStorage keys were captured and restored afterward; the temporary sessionStorage backup was removed.
+
+- Opened the review route before submitting a report and confirmed the empty-queue state.
+- Submitted with no reason selected and confirmed validation prevented saving. Submitted a job report and confirmed the report appeared in the existing local report store as Pending with its job context and explanation. A second submission for the same target/reason was rejected as a duplicate.
+- Submitted a Recruiter report for the listing's associated company, confirmed its target type/company context and Pending status, and confirmed duplicate rejection for the same recruiter/reason.
+- Changed the job report to Under Review and confirmed the report appeared under that filter, the listing showed a warning, and job details displayed the non-accusatory explanation and safety guidance. Pending did not produce a warning.
+- Resolved the job report and dismissed the recruiter report using the confirmation prompts. Confirmed Resolved and Dismissed filters each showed one report, Pending and Under Review showed none, and the listing/detail warning was gone after resolution.
+- Reloaded the page and confirmed Resolved and Dismissed statuses persisted.
+- At a 390px viewport, the review queue had no horizontal document overflow (390px viewport; 375px document scroll width), and a job details dialog remained within the viewport (about 358px wide; 390px document width).
+
+### Static checks
+
+- `node --check assets\js\main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS; 363 IDs, none duplicated.
+- Build/lint/type checks — not configured in this project. The optional Python Playwright suite was not run in this validation.
+
+### Limits and manual checks
+
+- Browser checks exercised the browser-local demo only. They do not establish authenticated admin access, secure storage, reviewer identity, real investigation, cross-device synchronization, or production fraud prevention.
+- Physical-device, cross-browser, keyboard-only, and screen-reader testing remains manual.
+
 # Phase 4, Step 4.4 — Transparent Job Matching & Recommendations
 
 ### Integrated-browser checks performed

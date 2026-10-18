@@ -2697,56 +2697,162 @@
       if (parsed.some(function (report) {
         return !report || typeof report !== "object" || !report.id || !report.jobId || !report.reason || !report.timestamp;
       })) return { reports: [], error: "Saved reports contain malformed records and were not changed." };
-      return { reports: parsed, error: "" };
+      return {
+        reports: parsed.map(function (report) {
+          var targetType = report.targetType === "recruiter" ? "recruiter" : "job";
+          var status = ["Pending", "Under Review", "Resolved", "Dismissed"].indexOf(report.status) >= 0
+            ? report.status
+            : "Pending";
+          return {
+            id: String(report.id),
+            jobId: String(report.jobId),
+            targetType: targetType,
+            targetId: String(report.targetId || (targetType === "recruiter"
+              ? report.companyId || report.companyName || report.recruiterListingId || report.jobId
+              : report.jobId)),
+            recruiterListingId: String(report.recruiterListingId || ""),
+            companyId: String(report.companyId || ""),
+            companyName: String(report.companyName || ""),
+            jobTitle: String(report.jobTitle || ""),
+            reason: String(report.reason),
+            explanation: String(report.explanation || ""),
+            timestamp: String(report.timestamp),
+            status: status,
+            updatedAt: String(report.updatedAt || report.timestamp)
+          };
+        }),
+        error: ""
+      };
     } catch (error) {
       return { reports: [], error: "Reports could not be read from this browser. No data was changed." };
     }
   }
 
-  function openJobReportForm(job, button) {
-    var existing = $("#jv-report-form", jobView);
-    if (existing) {
-      existing.hidden = !existing.hidden;
-      if (button) button.setAttribute("aria-expanded", String(!existing.hidden));
-      if (!existing.hidden) $("#jv-report-reason", existing).focus();
-      return;
-    }
-    var form = el("form", "jv__report-form");
+  var jobReportReasons = [
+    "Fake or misleading job",
+    "Payment or registration fee scam",
+    "Suspicious recruiter",
+    "Incorrect job details",
+    "Duplicate listing",
+    "Other"
+  ];
+
+  function reportTargetId(job, targetType) {
+    if (targetType !== "recruiter") return String(job.id);
+    return String(job.companyProfileId || String(job.company || "").trim().toLowerCase() || job.recruiterListingId || job.id);
+  }
+
+  function reportMatchesTarget(report, job, targetType, targetId) {
+    if (report.targetType !== targetType) return false;
+    if (report.targetId === targetId) return true;
+    if (targetType === "job") return String(report.jobId) === String(job.id);
+    return (job.recruiterListingId && report.recruiterListingId === String(job.recruiterListingId)) ||
+      (job.company && report.companyName.toLowerCase() === String(job.company).trim().toLowerCase());
+  }
+
+  function reportsUnderReviewForJob(job, reports) {
+    return reports.filter(function (report) {
+      if (report.status !== "Under Review") return false;
+      if (report.targetType === "job") {
+        return String(report.jobId) === String(job.id) ||
+          (!!job.recruiterListingId && report.recruiterListingId === String(job.recruiterListingId));
+      }
+      return (!!job.recruiterListingId && report.recruiterListingId === String(job.recruiterListingId)) ||
+        (!!job.company && report.companyName.toLowerCase() === String(job.company).trim().toLowerCase());
+    });
+  }
+
+  function jobReportWarning(job) {
+    var stored = readJobReports();
+    if (stored.error) return "";
+    var flagged = reportsUnderReviewForJob(job, stored.reports);
+    if (!flagged.length) return "";
+    return '<div class="job-report-warning" role="note"><strong>Report under review</strong><span>One or more local reports are marked for review. This is not a finding of wrongdoing.</span></div>';
+  }
+
+  function jobReportWarningElement(job) {
+    var stored = readJobReports();
+    if (stored.error) return null;
+    var flagged = reportsUnderReviewForJob(job, stored.reports);
+    if (!flagged.length) return null;
+    var warning = el("aside", "job-report-warning");
+    warning.setAttribute("role", "note");
+    warning.appendChild(el("strong", null, "Report under review"));
+    warning.appendChild(el("p", null, "One or more reports are marked for review in this local demo. This is not a finding that the job or recruiter is fraudulent."));
+    warning.appendChild(el("p", null, "For your safety, never pay job registration fees, verify recruiter identity independently, and do not share sensitive financial information."));
+    return warning;
+  }
+
+  function buildReportView(job, targetType) {
+    var view = el("section", "jv__view jv__report-view");
+    view.id = "jv-report-view";
+    var isRecruiterReport = targetType === "recruiter";
+    var title = isRecruiterReport ? "Report Recruiter" : "Report Job";
+    var heading = el("h3", "jv__title", title);
+    heading.id = "jv-report-title";
+    heading.tabIndex = -1;
+    view.appendChild(heading);
+    view.appendChild(el("p", "jv__note", (isRecruiterReport ? "Recruiter/company associated with " : "Listing: ") + job.title + " · " + job.company));
+    view.appendChild(el("p", "jv__missing", "Reports are saved only in this browser. They are not automatically investigated, verified, or resolved."));
+
+    var safety = el("aside", "report-safety");
+    safety.setAttribute("aria-label", "Job search safety guidance");
+    safety.appendChild(el("strong", null, "Stay safe while job searching"));
+    safety.appendChild(el("p", null, "Never pay a registration fee for a job. Verify recruiter identity independently and avoid sharing sensitive financial information."));
+    view.appendChild(safety);
+
+    var form = el("div", "jv__report-form");
     form.id = "jv-report-form";
-    form.noValidate = true;
-    var heading = el("h3", null, "Report this job or recruiter");
-    form.appendChild(heading);
-    form.appendChild(el("p", "jv__missing", "Reports are saved only in this browser and are not automatically reviewed or resolved."));
     var reasonLabel = el("label", null, "Reason for report");
     reasonLabel.htmlFor = "jv-report-reason";
     form.appendChild(reasonLabel);
     var reason = el("select", "select");
     reason.id = "jv-report-reason";
     reason.required = true;
+    reason.setAttribute("aria-describedby", "jv-report-error");
     reason.appendChild(new Option("Choose a reason", ""));
-    ["Suspected scam", "Payment requested", "Misleading description", "Impersonation", "Suspicious external link", "Other concern"].forEach(function (name) {
-      reason.appendChild(new Option(name, name));
-    });
+    jobReportReasons.forEach(function (name) { reason.appendChild(new Option(name, name)); });
     form.appendChild(reason);
-    var explanationLabel = el("label", null, "Additional details (optional)");
+    var explanationLabel = el("label", null, "Description (optional)");
     explanationLabel.htmlFor = "jv-report-explanation";
     form.appendChild(explanationLabel);
     var explanation = el("textarea", "input");
     explanation.id = "jv-report-explanation";
-    explanation.rows = 3;
+    explanation.rows = 4;
     explanation.maxLength = 1000;
+    explanation.setAttribute("aria-describedby", "jv-report-character-count jv-report-error");
     form.appendChild(explanation);
+    var characterCount = el("span", "jv__missing", "0 / 1000 characters");
+    characterCount.id = "jv-report-character-count";
+    form.appendChild(characterCount);
     var error = el("p", "field-error");
     error.id = "jv-report-error";
     error.setAttribute("role", "status");
+    error.setAttribute("aria-live", "polite");
     form.appendChild(error);
-    var submit = el("button", "btn btn--secondary", "Record report");
+    var actions = el("div", "jv__actions");
+    var submit = el("button", "btn btn--primary", "Submit report");
     submit.type = "button";
     submit.dataset.action = "report-submit";
-    form.appendChild(submit);
-    jobView.insertBefore(form, $("#jv-status", jobView));
+    actions.appendChild(submit);
+    var back = el("button", "btn btn--secondary", "Back to job details");
+    back.type = "button";
+    back.dataset.action = "back";
+    actions.appendChild(back);
+    form.appendChild(actions);
+    view.appendChild(form);
+    explanation.addEventListener("input", function () {
+      characterCount.textContent = explanation.value.length + " / 1000 characters";
+    });
+    return view;
+  }
+
+  function openJobReportForm(job, button, targetType) {
+    if (!detail || String(detail.job.id) !== String(job.id)) showDetails(job);
+    if (!detail) return;
+    detail.reportTarget = targetType === "recruiter" ? "recruiter" : "job";
     if (button) button.setAttribute("aria-expanded", "true");
-    reason.focus();
+    showView("report");
   }
 
   function saveJobReport(job) {
@@ -2754,25 +2860,34 @@
     var reason = $("#jv-report-reason", form);
     var explanation = $("#jv-report-explanation", form);
     var error = $("#jv-report-error", form);
-    if (!reason || !reason.value) {
+    var submit = $('[data-action="report-submit"]', form);
+    if (!reason || jobReportReasons.indexOf(reason.value) === -1) {
       if (error) error.textContent = "Choose a reason before recording the report.";
       if (reason) reason.focus();
       return;
     }
+    if (submit && submit.disabled) return;
+    if (submit) submit.disabled = true;
     var stored = readJobReports();
     if (stored.error) {
       if (error) error.textContent = stored.error;
+      if (submit) submit.disabled = false;
       return;
     }
+    var targetType = detail && detail.reportTarget === "recruiter" ? "recruiter" : "job";
+    var targetId = reportTargetId(job, targetType);
     if (stored.reports.some(function (report) {
-      return String(report.jobId) === String(job.id) && report.reason === reason.value;
+      return reportMatchesTarget(report, job, targetType, targetId) && report.reason === reason.value;
     })) {
-      if (error) error.textContent = "A report with this reason is already recorded for this job in this browser.";
+      if (error) error.textContent = "A report with this reason is already recorded for this " + targetType + " in this browser.";
+      if (submit) submit.disabled = false;
       return;
     }
     var reports = stored.reports.concat([{
       id: "report_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       jobId: String(job.id),
+      targetType: targetType,
+      targetId: targetId,
       recruiterListingId: String(job.recruiterListingId || ""),
       companyId: String(job.companyProfileId || ""),
       companyName: String(job.company || ""),
@@ -2780,18 +2895,118 @@
       reason: reason.value,
       explanation: explanation ? explanation.value.trim() : "",
       timestamp: new Date().toISOString(),
-      status: "Submitted"
+      updatedAt: new Date().toISOString(),
+      status: "Pending"
     }]);
     try {
       window.localStorage.setItem(JOB_REPORTS_KEY, JSON.stringify(reports));
     } catch (storageError) {
       if (error) error.textContent = "Report could not be saved in this browser. Check storage and try again.";
+      if (submit) submit.disabled = false;
       return;
     }
-    if (error) error.textContent = "Report recorded locally. It has not been reviewed or resolved.";
-    setStatus("Your report is recorded in this browser only; no review or resolution is implied.");
-    var submit = $('[data-action="report-submit"]', form);
-    if (submit) submit.disabled = true;
+    if (error) {
+      error.className = "auth-status";
+      error.textContent = "Report submitted to this browser-local demo queue with Pending status. No real reviewer has been notified.";
+    }
+    setStatus("Report saved locally as Pending. It has not been reviewed or resolved.");
+    refreshJobReportViews();
+  }
+
+  function formatReportDate(value) {
+    var date = new Date(value);
+    return isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleString();
+  }
+
+  function renderAdminReviewQueue() {
+    var list = document.getElementById("admin-review-list");
+    var feedback = document.getElementById("admin-review-feedback");
+    if (!list) return;
+    var stored = readJobReports();
+    if (stored.error) {
+      if (feedback) feedback.textContent = stored.error;
+      list.innerHTML = "";
+      return;
+    }
+    if (feedback) feedback.textContent = "";
+    var filter = document.getElementById("admin-review-status-filter");
+    var selectedStatus = filter ? filter.value : "all";
+    var reports = stored.reports.filter(function (report) {
+      return selectedStatus === "all" || report.status === selectedStatus;
+    });
+    if (!reports.length) {
+      var title = stored.reports.length ? "No reports match this status" : "No reports have been submitted";
+      var text = stored.reports.length ? "Choose another review status to see saved reports." : "Reports submitted from job listings will appear here in this browser-local demo.";
+      list.innerHTML = '<li class="review-queue-empty"><h3>' + escapeHtml(title) + '</h3><p>' + escapeHtml(text) + '</p></li>';
+      return;
+    }
+    list.innerHTML = reports.slice().sort(function (a, b) {
+      return String(b.timestamp).localeCompare(String(a.timestamp));
+    }).map(function (report) {
+      var subject = report.targetType === "recruiter" ? report.companyName || "Recruiter not named" : report.jobTitle || "Job listing";
+      var subheading = report.targetType === "recruiter"
+        ? "Recruiter/company report · associated job: " + (report.jobTitle || "Not recorded")
+        : "Job report · " + (report.companyName || "Company not recorded");
+      var actions = "";
+      if (report.status === "Pending") {
+        actions = '<button class="btn btn--secondary" type="button" data-report-status="' + escapeHtml(report.id) + '" data-next-report-status="Under Review">Mark Under Review</button>' +
+          '<button class="btn btn--text" type="button" data-report-status="' + escapeHtml(report.id) + '" data-next-report-status="Resolved">Resolve</button>' +
+          '<button class="btn btn--text" type="button" data-report-status="' + escapeHtml(report.id) + '" data-next-report-status="Dismissed">Dismiss</button>';
+      } else if (report.status === "Under Review") {
+        actions = '<button class="btn btn--secondary" type="button" data-report-status="' + escapeHtml(report.id) + '" data-next-report-status="Resolved">Resolve</button>' +
+          '<button class="btn btn--text" type="button" data-report-status="' + escapeHtml(report.id) + '" data-next-report-status="Dismissed">Dismiss</button>';
+      }
+      return '<li class="review-queue-item">' +
+        '<div class="review-queue-item__head"><div><h3>' + escapeHtml(subject) + '</h3><p>' + escapeHtml(subheading) + '</p></div><span class="review-status review-status--' + escapeHtml(report.status.toLowerCase().replace(/\s+/g, "-")) + '">' + escapeHtml(report.status) + '</span></div>' +
+        '<dl class="review-queue-item__details">' +
+          '<dt>Reason</dt><dd>' + escapeHtml(report.reason) + '</dd>' +
+          '<dt>Description</dt><dd>' + escapeHtml(report.explanation || "No description supplied.") + '</dd>' +
+          '<dt>Report date</dt><dd>' + escapeHtml(formatReportDate(report.timestamp)) + '</dd>' +
+          '<dt>Status updated</dt><dd>' + escapeHtml(formatReportDate(report.updatedAt)) + '</dd>' +
+        '</dl>' +
+        (report.status === "Under Review" ? '<p class="review-queue-item__notice">Under review is a demo workflow state, not a finding that this person or listing is fraudulent.</p>' : "") +
+        '<div class="review-queue-item__actions">' + actions + '</div>' +
+      '</li>';
+    }).join("");
+  }
+
+  function setJobReportStatus(reportId, nextStatus) {
+    if (["Under Review", "Resolved", "Dismissed"].indexOf(nextStatus) === -1) return;
+    if ((nextStatus === "Resolved" || nextStatus === "Dismissed") &&
+        !window.confirm("Set this local demo report to " + nextStatus + "? This does not contact anyone or complete a real investigation.")) return;
+    var stored = readJobReports();
+    var feedback = document.getElementById("admin-review-feedback");
+    if (stored.error) {
+      if (feedback) feedback.textContent = stored.error;
+      return;
+    }
+    var report = stored.reports.find(function (item) { return item.id === reportId; });
+    if (!report) {
+      if (feedback) feedback.textContent = "That report is no longer available in the local queue.";
+      renderAdminReviewQueue();
+      return;
+    }
+    if (report.status === "Resolved" || report.status === "Dismissed") {
+      if (feedback) feedback.textContent = "This report is already " + report.status + " and was not changed.";
+      return;
+    }
+    report.status = nextStatus;
+    report.updatedAt = new Date().toISOString();
+    try {
+      window.localStorage.setItem(JOB_REPORTS_KEY, JSON.stringify(stored.reports));
+    } catch (storageError) {
+      if (feedback) feedback.textContent = "The review status could not be saved in this browser. No status was changed.";
+      return;
+    }
+    renderAdminReviewQueue();
+    refreshJobReportViews();
+    if (feedback) feedback.textContent = "Local demo status updated to " + nextStatus + ". No external notification was sent.";
+  }
+
+  function refreshJobReportViews() {
+    if (typeof render === "function") render();
+    if (typeof renderStudentDashboard === "function") renderStudentDashboard();
+    if (document.getElementById("demo-review-queue") && !document.getElementById("demo-review-queue").hidden) renderAdminReviewQueue();
   }
 
   function companyProfileFormData() {
@@ -3918,6 +4133,16 @@
   });
 
   document.addEventListener("click", function (event) {
+    var reportStatusButton = event.target.closest("[data-report-status]");
+    if (reportStatusButton) {
+      setJobReportStatus(reportStatusButton.dataset.reportStatus, reportStatusButton.dataset.nextReportStatus);
+      return;
+    }
+    var adminExitButton = event.target.closest("#admin-review-exit");
+    if (adminExitButton) {
+      window.location.hash = "";
+      return;
+    }
     var recruiterRouteButton = event.target.closest("[data-recruiter-route]");
     if (recruiterRouteButton) {
       if (["dashboard", "listings"].indexOf(recruiterRouteButton.dataset.recruiterRoute) >= 0) resetRecruiterForm();
@@ -4074,6 +4299,49 @@
       return;
     }
   });
+
+  var adminReviewStatusFilter = document.getElementById("admin-review-status-filter");
+  if (adminReviewStatusFilter) adminReviewStatusFilter.addEventListener("change", renderAdminReviewQueue);
+
+  var adminReviewPreviousVisibility = null;
+  function syncDemoAdminReviewRoute() {
+    var panel = document.getElementById("demo-review-queue");
+    var mainContent = document.querySelector("main");
+    var footer = document.querySelector(".site-footer");
+    var header = document.querySelector(".site-header");
+    if (!panel) return;
+    var active = window.location.hash === "#demo-review-queue";
+    if (active && !adminReviewPreviousVisibility) {
+      adminReviewPreviousVisibility = {
+        main: mainContent ? mainContent.hidden : false,
+        footer: footer ? footer.hidden : false,
+        header: header ? header.hidden : false,
+        student: studentShell ? studentShell.hidden : true,
+        recruiter: recruiterShell ? recruiterShell.hidden : true
+      };
+    }
+    panel.hidden = !active;
+    if (active) {
+      if (mainContent) mainContent.hidden = true;
+      if (footer) footer.hidden = true;
+      if (header) header.hidden = true;
+      if (studentShell) studentShell.hidden = true;
+      if (recruiterShell) recruiterShell.hidden = true;
+    } else if (adminReviewPreviousVisibility) {
+      if (mainContent) mainContent.hidden = adminReviewPreviousVisibility.main;
+      if (footer) footer.hidden = adminReviewPreviousVisibility.footer;
+      if (header) header.hidden = adminReviewPreviousVisibility.header;
+      if (studentShell) studentShell.hidden = adminReviewPreviousVisibility.student;
+      if (recruiterShell) recruiterShell.hidden = adminReviewPreviousVisibility.recruiter;
+      adminReviewPreviousVisibility = null;
+    }
+    if (active) {
+      renderAdminReviewQueue();
+      panel.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }
+  }
+  window.addEventListener("hashchange", syncDemoAdminReviewRoute);
+  syncDemoAdminReviewRoute();
 
   var studentSkillAdd = document.getElementById("student-skill-add");
   if (studentSkillAdd) {
@@ -4273,6 +4541,7 @@
     }
     grid.innerHTML = list.map(function (o) {
       var isSaved = saved.indexOf(o.id) !== -1;
+      var reportWarning = jobReportWarning(o);
       return '<li class="card opp">' +
         '<div class="opp__top">' +
           '<span class="opp__mark" aria-hidden="true">' + escapeHtml(firstChar(o.company)) + "</span>" +
@@ -4283,10 +4552,12 @@
           '<button class="opp__save" type="button" data-save="' + o.id + '" aria-pressed="' + isSaved + '" aria-label="Bookmark: ' + escapeHtml(o.title) + '">' + icon("bookmark") + "</button>" +
         "</div>" +
         '<h3 class="opp__title">' + escapeHtml(o.title) + "</h3>" +
+        reportWarning +
         '<ul class="opp__meta">' + factsHtml(o) + "</ul>" +
         (o.skills.length ? '<ul class="tags" aria-label="Skills">' + o.skills.map(function (s) { return "<li>" + escapeHtml(s) + "</li>"; }).join("") + "</ul>" : "") +
         '<div class="opp__foot"><span class="badge ' + (o.type === "Internship" ? "badge--sage" : "") + '">' + escapeHtml(o.type) + "</span>" +
-        '<button class="btn btn--secondary" type="button" data-view="' + o.id + '" aria-label="View details: ' + escapeHtml(o.title) + '">View details</button></div>' +
+        '<div class="opp__actions"><button class="btn btn--text opp__report" type="button" data-report-job="' + escapeHtml(String(o.id)) + '" aria-label="Report Job: ' + escapeHtml(o.title) + '">Report Job</button>' +
+        '<button class="btn btn--secondary" type="button" data-view="' + o.id + '" aria-label="View details: ' + escapeHtml(o.title) + '">View details</button></div></div>' +
       "</li>";
     }).join("");
   }
@@ -4439,6 +4710,7 @@
   on(grid, "click", function (e) {
     var saveBtn = e.target.closest("[data-save]");
     var viewBtn = e.target.closest("[data-view]");
+    var reportJobBtn = e.target.closest("[data-report-job]");
     var emptyBtn = e.target.closest("[data-empty]");
     if (emptyBtn) {
       if (emptyBtn.dataset.empty === "clear") { resetAll(); }
@@ -4456,6 +4728,12 @@
     } else if (viewBtn) {
       var o = allJobs.filter(function (x) { return x.id === Number(viewBtn.dataset.view); })[0];
       if (o) showDetails(o);
+    } else if (reportJobBtn) {
+      var reportedJob = allJobs.find(function (x) { return String(x.id) === reportJobBtn.dataset.reportJob; });
+      if (reportedJob) {
+        showDetails(reportedJob);
+        openJobReportForm(reportedJob, reportJobBtn, "job");
+      }
     }
   });
 
@@ -4492,6 +4770,11 @@
 
   /* Same-browser changes made in another tab keep this tab's bookmarks in step. */
   window.addEventListener("storage", function (e) {
+    if (e.key === JOB_REPORTS_KEY) {
+      render();
+      renderAdminReviewQueue();
+      return;
+    }
     if (e.key === AUTH_PROFILE_KEY) {
       renderStudentDashboard();
       renderStudentApplicationLists();
@@ -4599,6 +4882,8 @@
     var note = el("p", "jv__note jv__note--" + (o.status === "DEMO" ? "demo" : o.status === "UNVERIFIED" ? "caution" : "verified"), statusNote(o));
     note.id = "jv-summary";
     view.appendChild(note);
+    var reportWarning = jobReportWarningElement(o);
+    if (reportWarning) view.appendChild(reportWarning);
     var companyTrustPanel = buildCompanyTrustPanel(o);
     if (companyTrustPanel) view.appendChild(companyTrustPanel);
     if (o.status === "VERIFIED" && o.evidenceUrl) {
@@ -4707,12 +4992,18 @@
     }
     section.appendChild(details);
     section.appendChild(el("p", "jv__note jv__note--caution", "A company website or email domain is not conclusive proof. Trust status is separate from job publication and recruiter activity."));
-    var report = el("button", "btn btn--text", "Report this job or recruiter");
-    report.type = "button";
-    report.dataset.action = "report-open";
-    report.setAttribute("aria-expanded", "false");
-    report.setAttribute("aria-controls", "jv-report-form");
-    section.appendChild(report);
+    var reportActions = el("div", "jv__actions");
+    var reportJob = el("button", "btn btn--text", "Report Job");
+    reportJob.type = "button";
+    reportJob.dataset.action = "report-open";
+    reportJob.dataset.reportTarget = "job";
+    reportActions.appendChild(reportJob);
+    var reportRecruiter = el("button", "btn btn--text", "Report Recruiter");
+    reportRecruiter.type = "button";
+    reportRecruiter.dataset.action = "report-open";
+    reportRecruiter.dataset.reportTarget = "recruiter";
+    reportActions.appendChild(reportRecruiter);
+    section.appendChild(reportActions);
     return section;
   }
 
@@ -4779,10 +5070,10 @@
     return view;
   }
 
-  /* Show "details", "review" or "demo". Only one is visible; review/demo are rebuilt each time so no stale state stays. */
+  /* One job-dialog view is visible at a time; transient review/report views are rebuilt to avoid stale data. */
   function showView(name) {
     if (!detail) return;
-    ["#jv-review", "#jv-demo"].forEach(function (sel) { var old = $(sel, jobView); if (old) old.remove(); });
+    ["#jv-review", "#jv-demo", "#jv-report-view"].forEach(function (sel) { var old = $(sel, jobView); if (old) old.remove(); });
     var main = $("#jv-details", jobView);
     setStatus("");
     if (name === "details") {
@@ -4794,9 +5085,14 @@
       return;
     }
     main.hidden = true;
-    var v = name === "review" ? buildReviewView(detail) : buildDemoView(detail);
+    var v;
+    if (name === "report") {
+      v = buildReportView(detail.job, detail.reportTarget || "job");
+    } else {
+      v = name === "review" ? buildReviewView(detail) : buildDemoView(detail);
+    }
     jobView.insertBefore(v, $("#jv-status", jobView));
-    var hid = name === "review" ? "jv-review-title" : "jv-demo-title";
+    var hid = name === "report" ? "jv-report-title" : name === "review" ? "jv-review-title" : "jv-demo-title";
     dialogEl.setAttribute("aria-labelledby", hid);
     dialogEl.removeAttribute("aria-describedby");
     $("#" + hid, jobView).focus();
@@ -4853,7 +5149,7 @@
         openStudentApplicationForm("", applicationJobId, true);
         break;
       case "report-open":
-        openJobReportForm(detail.job, btn);
+        openJobReportForm(detail.job, btn, btn.dataset.reportTarget);
         break;
       case "report-submit":
         saveJobReport(detail.job);

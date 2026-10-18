@@ -2,6 +2,14 @@
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
 
+## Phase 5.3 — Job/recruiter reports and demo review queue
+
+- Students can report a job from its listing card or details, and report the associated recruiter/company from job details. Reports support the requested reasons, an optional explanation, required-reason validation, duplicate prevention by target and reason, and a local confirmation.
+- A separate `#demo-review-queue` view lists saved reports and supports Pending, Under Review, Resolved, and Dismissed filters. Review status actions update the browser-local report record immediately; Resolve and Dismiss require confirmation.
+- A job receives a restrained warning only while an associated report is Under Review. It explains that a report is not a finding of wrongdoing and includes practical safety guidance. Pending, Resolved, and Dismissed reports do not create that warning.
+- This is a browser-local demo view, not an authenticated admin dashboard. Reports and review decisions are editable in the browser and do not trigger investigation, notification, enforcement, or cross-device synchronization. Real moderation requires an authenticated backend and authorized reviewers.
+- Phase 5.3 integrated-browser checks covered empty queue, required-reason validation, job and recruiter submission, duplicate prevention, status filtering/actions, warning display/removal, refresh persistence, and 390px layout. See `TEST_REPORT.md` for the performed checks and limits.
+
 ## Phase 4.4 highlights
 
 - Added **Recommended Opportunities** to the student dashboard using only currently available Job Explorer records and the saved student profile. Published recruiter-local listings are included as local DEMO data; expired, closed, draft, and unpublished records are not recommendations.

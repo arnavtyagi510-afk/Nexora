@@ -9,6 +9,14 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
+## Phase 5.3 — Job/recruiter reports and review queue
+
+- Reuses the Phase 4.1 `nexora:demo-job-reports` localStorage key. Records include job/recruiter target information, reason, optional description, report timestamp, status, and update timestamp. Legacy Submitted records normalize to Pending.
+- Report actions are available on Job Explorer cards and in job details. Recruiter reports are associated with the available company/listing context. Duplicate reports with the same target and reason are blocked in the current browser.
+- The `#demo-review-queue` route is a visibly labelled demo reviewer view (not a protected admin route). It filters reports by Pending, Under Review, Resolved, or Dismissed and allows status changes. Resolve and Dismiss require confirmation.
+- A warning is shown on job cards/details only for matching Under Review reports; it explicitly avoids declaring fraud and includes job-search safety guidance. Pending reports alone do not flag a listing.
+- There is no backend, authenticated reviewer identity, investigation, notification, or tamper-proof moderation record. Browser-local review state is not suitable for real trust or enforcement decisions.
+
 ## Phase 4, Step 4.4 — Transparent Job Matching & Recommendations
 
 - The student dashboard recommendation panel scores the existing `allJobs` collection: shipped DEMO opportunities plus recruiter listings currently Published by the local-demo policy. It does not create job records and does not recommend Draft, Closed, Unpublished, or Expired listings. Listing status and company trust status remain separate.
