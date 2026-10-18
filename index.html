@@ -50,13 +50,16 @@
       <nav class="nav__links" aria-label="Primary">
         <a class="nav__link" href="#opportunities">Opportunities</a>
         <a class="nav__link" href="#opportunities" data-filter-link="Internship">Internships</a>
+        <button class="nav__link" type="button" data-student-route="dashboard">Dashboard</button>
+        <button class="nav__link" type="button" data-student-route="profile">Profile</button>
+        <button class="nav__link" type="button" data-recruiter-route="dashboard">Recruiter</button>
         <button class="nav__link" type="button" data-soon="Companies">Companies<span class="soon-tag">Soon</span></button>
         <button class="nav__link" type="button" data-soon="Resources">Resources<span class="soon-tag">Soon</span></button>
       </nav>
 
       <div class="nav__actions">
-        <button class="btn btn--text" type="button" data-soon="Sign In">Sign In</button>
-        <button class="btn btn--primary" type="button" data-soon="Get Started">Get Started</button>
+        <button class="btn btn--text" type="button" data-auth-target="signin">Sign In</button>
+        <button class="btn btn--primary" type="button" data-auth-target="signup">Get Started</button>
         <button class="nav__toggle" type="button" id="menu-toggle" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
           <svg class="icon icon-open" aria-hidden="true"><use href="#i-menu"/></svg>
           <svg class="icon icon-close" aria-hidden="true"><use href="#i-close"/></svg>
@@ -68,15 +71,601 @@
       <div class="container">
         <a class="mobile-menu__link" href="#opportunities">Opportunities</a>
         <a class="mobile-menu__link" href="#opportunities" data-filter-link="Internship">Internships</a>
+        <button class="mobile-menu__link" type="button" data-student-route="dashboard">Dashboard</button>
+        <button class="mobile-menu__link" type="button" data-student-route="profile">Profile</button>
+        <button class="mobile-menu__link" type="button" data-recruiter-route="dashboard">Recruiter portal</button>
         <button class="mobile-menu__link" type="button" data-soon="Companies">Companies<span class="soon-tag">Soon</span></button>
         <button class="mobile-menu__link" type="button" data-soon="Resources">Resources<span class="soon-tag">Soon</span></button>
         <div class="mobile-menu__actions">
-          <button class="btn btn--secondary btn--block" type="button" data-soon="Sign In">Sign In</button>
-          <button class="btn btn--primary btn--block" type="button" data-soon="Get Started">Get Started</button>
+          <button class="btn btn--secondary btn--block" type="button" data-auth-target="signin">Sign In</button>
+          <button class="btn btn--primary btn--block" type="button" data-auth-target="signup">Get Started</button>
         </div>
       </div>
     </div>
   </header>
+
+  <section class="auth-shell" id="auth-shell" hidden aria-live="polite">
+    <div class="container">
+      <div class="auth-card" aria-labelledby="auth-heading">
+        <div class="auth-card__top">
+          <div>
+            <p class="badge badge--sage">Demo access</p>
+            <h2 id="auth-heading">Welcome to NEXORA</h2>
+          </div>
+          <button class="btn btn--text" type="button" id="auth-close" aria-label="Return to browsing">Return to browsing</button>
+        </div>
+
+        <div class="segmented auth-tabs" role="tablist" aria-label="Authentication options">
+          <button type="button" class="is-active" role="tab" aria-selected="true" aria-controls="auth-signin-panel" id="tab-signin" data-auth-tab="signin">Sign In</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="auth-signup-panel" id="tab-signup" data-auth-tab="signup">Get Started</button>
+        </div>
+
+        <div class="auth-views">
+          <form id="auth-signin-panel" class="auth-form is-visible" novalidate>
+            <p class="auth-form__note">This demo sign in is intentionally frontend-only. No real account or secure backend is connected.</p>
+            <div class="field-group">
+              <label for="signin-email">Email address</label>
+              <input class="input" id="signin-email" name="email" type="email" autocomplete="email" required>
+              <p class="field-error" id="signin-email-error" aria-live="polite"></p>
+            </div>
+            <div class="field-group">
+              <label for="signin-password">Password</label>
+              <div class="password-wrap">
+                <input class="input" id="signin-password" name="password" type="password" autocomplete="current-password" required>
+                <button class="password-toggle" type="button" data-password-toggle="signin-password" aria-label="Show password">Show</button>
+              </div>
+              <p class="field-error" id="signin-password-error" aria-live="polite"></p>
+            </div>
+            <div class="auth-form__actions auth-form__actions--stack">
+              <button class="btn btn--primary btn--block" type="submit">Continue</button>
+              <button class="link auth__link" type="button" data-auth-forgot="true">Forgot password?</button>
+            </div>
+            <p class="auth-status" id="demo-auth-status" aria-live="polite"></p>
+          </form>
+
+          <form id="auth-signup-panel" class="auth-form" novalidate>
+            <div class="field-group">
+              <label for="signup-name">Full name</label>
+              <input class="input" id="signup-name" name="fullName" type="text" autocomplete="name" required>
+              <p class="field-error" id="signup-name-error" aria-live="polite"></p>
+            </div>
+            <div class="field-group">
+              <label for="signup-email">Email address</label>
+              <input class="input" id="signup-email" name="email" type="email" autocomplete="email" required>
+              <p class="field-error" id="signup-email-error" aria-live="polite"></p>
+            </div>
+            <div class="field-group">
+              <label for="signup-password">Password</label>
+              <div class="password-wrap">
+                <input class="input" id="signup-password" name="password" type="password" autocomplete="new-password" required>
+                <button class="password-toggle" type="button" data-password-toggle="signup-password" aria-label="Show password">Show</button>
+              </div>
+              <p class="field-error" id="signup-password-error" aria-live="polite"></p>
+            </div>
+            <div class="field-group">
+              <label for="signup-confirm">Confirm password</label>
+              <div class="password-wrap">
+                <input class="input" id="signup-confirm" name="confirmPassword" type="password" autocomplete="new-password" required>
+                <button class="password-toggle" type="button" data-password-toggle="signup-confirm" aria-label="Show password">Show</button>
+              </div>
+              <p class="field-error" id="signup-confirm-error" aria-live="polite"></p>
+            </div>
+            <div class="field-group">
+              <label for="signup-role">Account role</label>
+              <select class="select" id="signup-role" name="role" required>
+                <option value="">Select an account role</option>
+                <option value="Student">Student / Candidate</option>
+                <option value="Candidate">Candidate</option>
+              </select>
+              <p class="field-error" id="signup-role-error" aria-live="polite"></p>
+            </div>
+            <label class="checkbox-row" for="signup-terms">
+              <input type="checkbox" id="signup-terms" name="terms" required>
+              <span>I acknowledge the demo terms and privacy notice. This is a frontend-only practice account and no real account is created.</span>
+            </label>
+            <p class="field-error" id="signup-terms-error" aria-live="polite"></p>
+            <div class="auth-form__actions">
+              <button class="btn btn--primary btn--block" type="submit">Create demo account</button>
+            </div>
+            <p class="auth-status" id="signup-status" aria-live="polite"></p>
+          </form>
+
+          <div id="auth-onboarding-panel" class="auth-form auth-form--wide" hidden>
+            <div class="auth-banner">
+              <strong>Demo onboarding</strong>
+              <span>Only browser-local, non-sensitive profile data is saved here.</span>
+            </div>
+            <p class="onboarding-step__label" id="onboarding-step-label">Step 1 of 4</p>
+
+            <div class="onboarding-step is-visible" data-step="1">
+              <div class="field-group">
+                <label for="onboarding-name">Full name</label>
+                <input class="input" id="onboarding-name" name="fullName" type="text" autocomplete="name">
+                <p class="field-error" id="onboarding-name-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-headline">Professional headline (optional)</label>
+                <input class="input" id="onboarding-headline" name="headline" type="text" maxlength="120">
+              </div>
+              <div class="field-group">
+                <label for="onboarding-education">Current education level</label>
+                <select class="select" id="onboarding-education" name="education">
+                  <option value="">Select education level</option>
+                  <option value="High school">High school</option>
+                  <option value="Undergraduate">Undergraduate</option>
+                  <option value="Graduate">Graduate</option>
+                  <option value="Postgraduate">Postgraduate</option>
+                  <option value="Working professional">Working professional</option>
+                </select>
+                <p class="field-error" id="onboarding-education-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-college">College or university (optional)</label>
+                <input class="input" id="onboarding-college" name="college" type="text" maxlength="120">
+              </div>
+              <div class="field-group">
+                <label for="onboarding-graduation">Graduation year (optional)</label>
+                <input class="input" id="onboarding-graduation" name="graduationYear" type="number" inputmode="numeric" min="1950" max="2100" placeholder="2028">
+              </div>
+            </div>
+
+            <div class="onboarding-step" data-step="2">
+              <div class="field-group">
+                <label for="onboarding-role-target">Desired role or job title</label>
+                <input class="input" id="onboarding-role-target" name="desiredRoles" type="text" placeholder="Product Analyst, Frontend Developer">
+                <p class="field-error" id="onboarding-role-target-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-opportunity-type">Preferred opportunity type</label>
+                <select class="select" id="onboarding-opportunity-type" name="opportunityType">
+                  <option value="">Select preferred type</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Freelance">Freelance</option>
+                </select>
+                <p class="field-error" id="onboarding-opportunity-type-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-work-mode">Preferred work mode</label>
+                <select class="select" id="onboarding-work-mode" name="workMode">
+                  <option value="">Select work mode</option>
+                  <option value="Remote">Remote</option>
+                  <option value="Hybrid">Hybrid</option>
+                  <option value="On-site">On-site</option>
+                </select>
+                <p class="field-error" id="onboarding-work-mode-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-location">Preferred locations (optional)</label>
+                <input class="input" id="onboarding-location" name="preferredLocations" type="text" placeholder="Bengaluru, Remote, Hyderabad">
+              </div>
+            </div>
+
+            <div class="onboarding-step" data-step="3">
+              <div class="field-group">
+                <label>Skills</label>
+                <div class="skill-adder">
+                  <input class="input" id="onboarding-skill-input" type="text" placeholder="Add a skill and press Enter">
+                  <button class="btn btn--secondary" type="button" id="onboarding-skill-add">Add skill</button>
+                </div>
+                <ul class="skill-list" id="onboarding-skill-list" aria-live="polite"></ul>
+                <p class="field-error" id="onboarding-skill-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-interests">Career interests or domains</label>
+                <input class="input" id="onboarding-interests" name="careerInterests" type="text" placeholder="Product, AI, Data, Design">
+              </div>
+              <div class="field-group">
+                <label for="onboarding-github">GitHub profile URL (optional)</label>
+                <input class="input" id="onboarding-github" name="githubUrl" type="url" inputmode="url" placeholder="https://github.com/yourname">
+                <p class="field-error" id="onboarding-github-error" aria-live="polite"></p>
+              </div>
+              <div class="field-group">
+                <label for="onboarding-portfolio">Portfolio URL (optional)</label>
+                <input class="input" id="onboarding-portfolio" name="portfolioUrl" type="url" inputmode="url" placeholder="https://yourportfolio.com">
+                <p class="field-error" id="onboarding-portfolio-error" aria-live="polite"></p>
+              </div>
+            </div>
+
+            <div class="onboarding-step" data-step="4">
+              <div class="summary-card" id="onboarding-summary"></div>
+            </div>
+
+            <div class="auth-form__actions auth-form__actions--spread">
+              <button class="btn btn--text" type="button" id="onboarding-exit">Return to browsing</button>
+              <div class="auth-form__actions auth-form__actions--inline">
+                <button class="btn btn--secondary" type="button" id="onboarding-back">Back</button>
+                <button class="btn btn--primary" type="button" id="onboarding-next">Continue</button>
+              </div>
+            </div>
+
+            <p class="auth-status" id="onboarding-status" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <button class="btn btn--text auth-reset" type="button" id="auth-reset-profile">Reset demo profile data</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="student-shell" id="student-shell" hidden>
+    <div class="container student-shell__wrap">
+      <aside class="student-shell__sidebar" aria-label="Student navigation">
+        <div class="student-shell__title">
+          <span class="badge badge--sage">Student portal</span>
+          <h2>My NEXORA</h2>
+        </div>
+        <button type="button" class="student-shell__nav is-active" data-student-route="dashboard">Dashboard</button>
+        <button type="button" class="student-shell__nav" data-student-route="profile">Profile</button>
+        <button type="button" class="student-shell__nav" data-student-route="explore">Explore jobs</button>
+      </aside>
+
+      <div class="student-shell__panel">
+        <section class="student-view is-visible" id="student-dashboard-view" aria-live="polite">
+          <div class="student-banner">
+            <div>
+              <p class="student-banner__eyebrow">Welcome back</p>
+              <h2 id="student-welcome-name">Student</h2>
+            </div>
+            <div class="student-completion" aria-live="polite">
+              <span class="student-completion__label">Profile completion</span>
+              <div class="student-completion__track" aria-hidden="true"><span id="student-completion-bar"></span></div>
+              <strong id="student-completion-value">0%</strong>
+            </div>
+          </div>
+
+          <div class="student-grid">
+            <section class="student-card">
+              <div class="student-card__head">
+                <h3>Saved Jobs</h3>
+                <button class="link" type="button" data-student-route="explore">Browse all</button>
+              </div>
+              <ul class="student-list" id="student-saved-jobs"></ul>
+            </section>
+
+            <section class="student-card">
+              <div class="student-card__head">
+                <h3>My Applications</h3>
+              </div>
+              <ul class="student-list" id="student-applications"></ul>
+            </section>
+          </div>
+
+          <section class="student-card">
+            <div class="student-card__head">
+              <h3>Profile Overview</h3>
+              <button class="btn btn--secondary" type="button" data-student-route="profile">Edit profile</button>
+            </div>
+            <div id="student-profile-overview" class="student-overview"></div>
+          </section>
+        </section>
+
+        <section class="student-view" id="student-profile-view" hidden>
+          <div class="student-card student-card--wide">
+            <div class="student-card__head">
+              <h3>Student profile</h3>
+              <button class="btn btn--text" type="button" data-student-route="dashboard">Back to dashboard</button>
+            </div>
+
+            <form id="student-profile-form" novalidate>
+              <div class="student-form-grid">
+                <div class="field-group">
+                  <label for="student-profile-name">Full name</label>
+                  <input class="input" id="student-profile-name" name="fullName" type="text" autocomplete="name">
+                  <p class="field-error" id="student-profile-name-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-headline">Professional headline</label>
+                  <input class="input" id="student-profile-headline" name="headline" type="text" maxlength="120" placeholder="Frontend developer with a focus on product thinking">
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-education">Current education level</label>
+                  <select class="select" id="student-profile-education" name="educationLevel">
+                    <option value="">Select education level</option>
+                    <option value="High school">High school</option>
+                    <option value="Undergraduate">Undergraduate</option>
+                    <option value="Graduate">Graduate</option>
+                    <option value="Postgraduate">Postgraduate</option>
+                    <option value="Working professional">Working professional</option>
+                  </select>
+                  <p class="field-error" id="student-profile-education-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-college">College or university</label>
+                  <input class="input" id="student-profile-college" name="collegeName" type="text" maxlength="120" placeholder="Indian Institute of Technology">
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-graduation">Graduation year</label>
+                  <input class="input" id="student-profile-graduation" name="graduationYear" type="number" inputmode="numeric" min="1950" max="2100" placeholder="2028">
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-role">Desired role or job title</label>
+                  <input class="input" id="student-profile-role" name="desiredRoles" type="text" placeholder="Product Analyst, Frontend Developer">
+                  <p class="field-error" id="student-profile-role-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-opportunity">Preferred opportunity type</label>
+                  <select class="select" id="student-profile-opportunity" name="opportunityType">
+                    <option value="">Select preferred type</option>
+                    <option value="Internship">Internship</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Freelance">Freelance</option>
+                  </select>
+                  <p class="field-error" id="student-profile-opportunity-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-workmode">Preferred work mode</label>
+                  <select class="select" id="student-profile-workmode" name="workMode">
+                    <option value="">Select work mode</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="On-site">On-site</option>
+                  </select>
+                  <p class="field-error" id="student-profile-workmode-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group field-group--full">
+                  <label for="student-profile-locations">Preferred locations</label>
+                  <input class="input" id="student-profile-locations" name="preferredLocations" type="text" placeholder="Bengaluru, Remote, Hyderabad">
+                </div>
+
+                <div class="field-group field-group--full">
+                  <label>Skills</label>
+                  <div class="skill-adder">
+                    <input class="input" id="student-skill-name" type="text" placeholder="Add a skill">
+                    <select class="select" id="student-skill-level" aria-label="Skill proficiency level">
+                      <option value="">Select level (optional)</option>
+                      <option value="Beginner">Beginner</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                      <option value="Expert">Expert</option>
+                    </select>
+                    <select class="select" id="student-skill-project" aria-label="Link skill to project">
+                      <option value="">Link to project (optional)</option>
+                    </select>
+                    <button class="btn btn--secondary" type="button" id="student-skill-add">Add skill</button>
+                  </div>
+                  <ul class="skill-list" id="student-skill-list" aria-live="polite"></ul>
+                  <p class="field-error" id="student-skill-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group field-group--full">
+                  <label for="student-profile-interests">Career interests or domains</label>
+                  <input class="input" id="student-profile-interests" name="careerInterests" type="text" placeholder="Product, AI, Finance, Design">
+                </div>
+
+                <div class="field-group field-group--full">
+                  <label>Proof of Work</label>
+                  <div class="student-project-editor">
+                    <div class="student-form-grid">
+                      <div class="field-group">
+                        <label for="student-project-title">Project title</label>
+                        <input class="input" id="student-project-title" type="text" placeholder="NEXORA dashboard redesign">
+                        <p class="field-error" id="student-project-title-error" aria-live="polite"></p>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="student-project-role">Project role</label>
+                        <input class="input" id="student-project-role" type="text" placeholder="Frontend engineer">
+                        <p class="field-error" id="student-project-role-error" aria-live="polite"></p>
+                      </div>
+
+                      <div class="field-group field-group--full">
+                        <label for="student-project-description">Project description</label>
+                        <textarea class="input" id="student-project-description" rows="4" placeholder="Describe the problem, decisions, and outcome"></textarea>
+                        <p class="field-error" id="student-project-description-error" aria-live="polite"></p>
+                      </div>
+
+                      <div class="field-group field-group--full">
+                        <label for="student-project-technologies">Technologies used</label>
+                        <input class="input" id="student-project-technologies" type="text" placeholder="React, TypeScript, Node.js, PostgreSQL">
+                        <p class="field-error" id="student-project-technologies-error" aria-live="polite"></p>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="student-project-github">GitHub repository URL (optional)</label>
+                        <input class="input" id="student-project-github" type="url" inputmode="url" placeholder="https://github.com/yourname/project">
+                        <p class="field-error" id="student-project-github-error" aria-live="polite"></p>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="student-project-demo">Live demo URL (optional)</label>
+                        <input class="input" id="student-project-demo" type="url" inputmode="url" placeholder="https://yourproject.example.com">
+                        <p class="field-error" id="student-project-demo-error" aria-live="polite"></p>
+                      </div>
+                    </div>
+
+                    <div class="student-form-controls student-form-controls--left">
+                      <button class="btn btn--secondary" type="button" id="student-project-clear">Clear</button>
+                      <button class="btn btn--primary" type="button" id="student-project-save">Add project</button>
+                    </div>
+                  </div>
+                  <ul class="student-project-list" id="student-project-list" aria-live="polite"></ul>
+                  <p class="field-error" id="student-project-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-github">GitHub profile URL</label>
+                  <input class="input" id="student-profile-github" name="githubUrl" type="url" inputmode="url" placeholder="https://github.com/yourname">
+                  <p class="field-error" id="student-profile-github-error" aria-live="polite"></p>
+                </div>
+
+                <div class="field-group">
+                  <label for="student-profile-portfolio">Portfolio URL</label>
+                  <input class="input" id="student-profile-portfolio" name="portfolioUrl" type="url" inputmode="url" placeholder="https://yourportfolio.com">
+                  <p class="field-error" id="student-profile-portfolio-error" aria-live="polite"></p>
+                </div>
+              </div>
+
+              <div class="student-form-controls">
+                <button class="btn btn--secondary" type="button" data-student-route="dashboard">Cancel</button>
+                <button class="btn btn--primary" type="submit">Save profile</button>
+              </div>
+
+              <p class="auth-status" id="student-profile-status" aria-live="polite"></p>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="recruiter-shell" id="recruiter-shell" hidden>
+    <div class="container student-shell__wrap recruiter-shell__wrap">
+      <aside class="student-shell__sidebar" aria-label="Recruiter navigation">
+        <div class="student-shell__title">
+          <span class="badge badge--sage">Recruiter tools · local demo</span>
+          <h2>Recruiter portal</h2>
+        </div>
+        <button type="button" class="student-shell__nav is-active" data-recruiter-route="dashboard">Dashboard</button>
+        <button type="button" class="student-shell__nav" data-recruiter-route="listings">My Job Listings</button>
+        <button type="button" class="student-shell__nav" data-recruiter-route="explore">Main job explorer</button>
+      </aside>
+
+      <div class="student-shell__panel">
+        <section class="recruiter-view is-visible" id="recruiter-dashboard-view" aria-labelledby="recruiter-dashboard-title">
+          <div class="student-card__head">
+            <div>
+              <p class="student-banner__eyebrow">Browser-local recruiter workspace</p>
+              <h2 id="recruiter-dashboard-title">Recruiter Dashboard</h2>
+            </div>
+            <button class="btn btn--primary" type="button" data-recruiter-create>New job draft</button>
+          </div>
+          <p class="recruiter-notice">Listings here are saved only in this browser. Marking a listing Published is a demo status and does not publish it to the public job explorer or verify the employer.</p>
+          <div class="recruiter-metrics" aria-live="polite">
+            <article class="student-card recruiter-metric">
+              <h3>Total listings</h3>
+              <strong id="recruiter-total-count">0</strong>
+            </article>
+            <article class="student-card recruiter-metric">
+              <h3>Active listings</h3>
+              <strong id="recruiter-active-count">0</strong>
+              <p>Marked Published locally; not publicly listed</p>
+            </article>
+            <article class="student-card recruiter-metric">
+              <h3>Draft listings</h3>
+              <strong id="recruiter-draft-count">0</strong>
+            </article>
+          </div>
+          <section class="student-card recruiter-recent">
+            <div class="student-card__head">
+              <h3>My Job Listings</h3>
+              <button class="link" type="button" data-recruiter-route="listings">View all listings</button>
+            </div>
+            <ul class="recruiter-list" id="recruiter-dashboard-list"></ul>
+          </section>
+        </section>
+
+        <section class="recruiter-view" id="recruiter-listings-view" hidden aria-labelledby="recruiter-listings-title">
+          <div class="student-card__head">
+            <div>
+              <p class="student-banner__eyebrow">Recruiter workspace</p>
+              <h2 id="recruiter-listings-title">My Job Listings</h2>
+            </div>
+            <button class="btn btn--primary" type="button" data-recruiter-create>Create job draft</button>
+          </div>
+          <p class="recruiter-notice">These are private, local demo records. They are not visible to job seekers and are not verified by NEXORA.</p>
+          <p class="auth-status" id="recruiter-listing-status" role="status" aria-live="polite"></p>
+          <ul class="recruiter-list" id="recruiter-listings"></ul>
+        </section>
+
+        <section class="recruiter-view" id="recruiter-editor-view" hidden aria-labelledby="recruiter-editor-title">
+          <div class="student-card">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Local demo listing</p>
+                <h2 id="recruiter-editor-title">Create a job draft</h2>
+              </div>
+              <button class="btn btn--text" type="button" data-recruiter-route="listings">Back to listings</button>
+            </div>
+            <form id="recruiter-listing-form" novalidate>
+              <div class="student-form-grid">
+                <div class="field-group">
+                  <label for="recruiter-job-title">Job title</label>
+                  <input class="input" id="recruiter-job-title" name="title" type="text" maxlength="120" required>
+                  <p class="field-error" id="recruiter-job-title-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-company">Company name</label>
+                  <input class="input" id="recruiter-company" name="company" type="text" maxlength="120" required>
+                  <p class="field-error" id="recruiter-company-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group field-group--full">
+                  <label for="recruiter-description">Job description</label>
+                  <textarea class="input" id="recruiter-description" name="description" rows="5" maxlength="5000" required></textarea>
+                  <p class="field-error" id="recruiter-description-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-location">Location</label>
+                  <input class="input" id="recruiter-location" name="location" type="text" maxlength="120" required>
+                  <p class="field-error" id="recruiter-location-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-job-type">Job type</label>
+                  <select class="select" id="recruiter-job-type" name="jobType" required>
+                    <option value="">Select job type</option>
+                    <option value="Job">Job</option>
+                    <option value="Internship">Internship</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Freelance">Freelance</option>
+                  </select>
+                  <p class="field-error" id="recruiter-job-type-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-work-mode">Work mode</label>
+                  <select class="select" id="recruiter-work-mode" name="workMode" required>
+                    <option value="">Select work mode</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="On-site">On-site</option>
+                  </select>
+                  <p class="field-error" id="recruiter-work-mode-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-skills">Required skills</label>
+                  <input class="input" id="recruiter-skills" name="requiredSkills" type="text" maxlength="500" placeholder="Separate skills with commas" required>
+                  <p class="field-error" id="recruiter-skills-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-apply-url">Official application URL (optional)</label>
+                  <input class="input" id="recruiter-apply-url" name="applyUrl" type="url" inputmode="url" placeholder="https://company.example/careers/role">
+                  <p class="field-error" id="recruiter-apply-url-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-status">Listing status</label>
+                  <select class="select" id="recruiter-status" name="status">
+                    <option value="Draft">Draft</option>
+                    <option value="Published">Published (demo status only)</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                  <p class="field-error" id="recruiter-status-error" aria-live="polite"></p>
+                </div>
+              </div>
+              <p class="recruiter-notice">Saving as Published only changes this local record’s status. It does not make the job public, verified, or available to apply to.</p>
+              <div class="student-form-controls recruiter-form-controls">
+                <button class="btn btn--text" type="button" data-recruiter-route="listings">Cancel</button>
+                <button class="btn btn--secondary" type="button" id="recruiter-save-draft">Save draft</button>
+                <button class="btn btn--primary" type="submit" id="recruiter-save-listing">Save listing</button>
+              </div>
+              <p class="auth-status" id="recruiter-form-status" aria-live="polite"></p>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
 
   <main id="main">
     <!-- A. Hero -->

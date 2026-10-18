@@ -1,3 +1,42 @@
+# NEXORA — Test Report
+
+## Phase 3, Step 3.1 — recruiter portal browser validation
+
+Actual checks performed in the integrated browser against a temporary local HTTP server:
+
+- Recruiter dashboard started with zero listings and an honest empty state.
+- Saving an empty draft showed required-field errors and `aria-invalid` state.
+- A `javascript:` application URL was rejected; a valid HTTPS URL was accepted.
+- A completed listing saved as Draft, rendered entered HTML-like title text literally (no injected `<b>` element), and persisted after page reload.
+- Editing the record changed its title and status. Dashboard counts updated to total 1, active 1, drafts 0 for the Published status.
+- The Published row clearly stated that it was not publicly published or verified.
+- Delete opened a confirmation prompt; accepting it removed the record and returned the listing count to zero with the empty state.
+- Student Dashboard and Profile routes remained reachable; returning to the job explorer showed the six existing demo cards and keyword search for “frontend” returned one expected card.
+- Existing bookmark interaction saved and removed a job successfully. A demo job’s Apply Now view still explained that it could not accept an application and kept the visitor on NEXORA.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parser — PASS; no duplicate element IDs found in `index.html`.
+
+What was not performed for Step 3.1:
+
+- The existing optional Python Playwright regression suite was not run because Python Playwright is not installed in this environment. Its previous Step 1.3 result is historical and is not a full regression result for this change.
+- No dedicated cross-browser, screen-reader, keyboard-only, storage-quota, or real-device test was performed.
+- No backend or public listing endpoint exists, so no real publishing, account, company verification, or external application flow was testable.
+
+## Phase 2, Step 2.2 — static validation only
+
+Actual checks performed in this session:
+
+- `node --check assets/js/main.js` — PASS
+- Local static HTTP response check for the project directory — PASS
+
+What was not performed:
+- No browser automation / Playwright UI checks were run for the student dashboard/profile flow in this environment.
+- No interactive browser assertions were executed for dashboard navigation, saved-job synchronization, or profile editing.
+
+This means Step 2.2 is verified as a static front-end change, but not as a fully browser-tested feature set until a proper headless browser environment is available.
+
+## Phase 1, Step 1.3 — browser-tested report
+
 # NEXORA — Test Report (Phase 1, Step 1.3)
 
 Every PASS below comes from a check that was actually executed by `tests/regression_test.py` in headless Chromium (Playwright). The last run executed **77 checks: 77 PASS, 0 FAIL** (48 carried from Step 1.2, two of them with updated expectations, plus 29 new Step 1.3 checks). Anything not executed is listed under NOT TESTED; it is not claimed.

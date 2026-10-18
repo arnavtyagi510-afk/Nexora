@@ -1,5 +1,52 @@
 # NEXORA — Progress
 
+## Phase 3, Step 3.1 — Recruiter Portal Foundation — STATUS: COMPLETE (frontend demo scope)
+
+### Features implemented
+- Added a separate recruiter dashboard and My Job Listings view without changing the student portal or public job explorer.
+- Added actual-data counts for total records, Published (active demo-status) records, and drafts; closed records are included only in the total.
+- Added create/edit form for job description fields, required skills, optional safe HTTP(S) application URL, and Draft / Published / Closed status.
+- Added browser-confirmed deletion, validation, safe escaped listing display, date formatting, local storage error states, empty states, and same-origin storage-event refresh.
+- Persisted independent recruiter records using `nexora:demo-recruiter-listings`; did not seed listings or connect them to the public opportunities.
+- Clearly disclosed that the portal is local-only and Published does not publish or verify a job.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `assets/css/home.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS.
+- Integrated browser validation against a local HTTP server — recruiter create/required validation/unsafe URL rejection/draft save/reload persistence/edit/status counts/published disclosure/confirmed delete PASS.
+- Integrated browser regression — student dashboard/profile navigation and existing six-card job explorer plus keyword search PASS.
+- The existing optional Python Playwright suite was not run because the Python Playwright package is unavailable.
+
+### Known limitations
+- Recruiter data is browser-local and is not tied to an account or synced to a backend.
+- Published is a local display status only; listings do not appear in the public explorer, cannot be externally applied to through this portal, and are not verified.
+- No real recruiter identity, company verification, employer roles, shared database, or public publishing workflow is implemented.
+
+## Phase 2, Step 2.2 — Student Profile & Dashboard Foundation — STATUS: COMPLETE (frontend demo scope)
+
+### Features implemented
+- Student portal shell with dashboard/profile navigation and responsive layout.
+- Welcome banner and profile completion meter calculated from the existing local demo profile data.
+- Editable student profile form with save-to-localStorage behavior using the existing `nexora:demo-profile` structure.
+- Saved Jobs section synchronized with the existing bookmark system (`nexora:demo-saved`).
+- Honest empty states for My Applications and any profile content not yet available.
+- Dashboard and profile views remain in the same plain HTML/CSS/JS architecture without changing the established forest-green and ivory theme.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `assets/css/home.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Static validation performed: `node --check assets/js/main.js` passed.
+- Browser automation was not executed for this Step 2.2 work in this environment, so browser-level UI assertions remain a known limitation.
+
+### Known limitations
+- No backend, no real accounts, and no real application tracking are in place.
+- My Applications intentionally stays empty and does not fabricate status data.
+- Dashboard data is browser-local only and resets with local demo data resets.
+
 ## Phase 1, Step 1.3 — Job details and application flow — STATUS: COMPLETE (frontend scope)
 
 ### Features implemented

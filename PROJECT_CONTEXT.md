@@ -9,6 +9,39 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
+## Phase 3, Step 3.1 — Recruiter Portal Foundation
+
+### Scope and storage
+- The recruiter tools live in a separate portal shell in the existing single-page HTML/CSS/JS application. They do not replace or share student profile data.
+- Recruiter listings are saved in the current browser under `nexora:demo-recruiter-listings`; no records are seeded. Create, edit, delete, and reload operate only on this local demo list.
+- No recruiter identity, account, password, company verification, backend, or public listing endpoint exists. A record marked **Published** is only marked Published in this browser; it is never added to `NEXORA_DEMO.opportunities` or the public job explorer.
+- Dashboard counts come from actual stored records: Total includes all valid records, Active counts status `Published` (displayed as a local demo status only), and Draft counts `Draft`. Closed records count toward Total, not Active or Draft.
+
+### Recruiter portal behaviour
+- Separate Dashboard, My Job Listings, and create/edit views; navigation returns to the main job explorer.
+- Listing fields: title, company, description, location, job type, work mode, required skills, optional application URL, status, and `updatedAt`.
+- Required fields are checked before saving. Optional application URLs allow only HTTP(S), a hostname, and no embedded credentials. User-entered text is HTML-escaped in listing cards.
+- Delete requires native browser confirmation. Storage read/write errors are announced rather than presented as successful operations. A `storage` event refreshes the listing counts and views across same-origin tabs.
+- Empty states do not imply listings exist, and published-status notices state that the record is not public or verified.
+
+### Validation notes
+The Step 3.1 flows were exercised in the integrated browser against a local HTTP server, including create/draft persistence, editing/status counts, URL and required-field validation, safe rendering, deletion confirmation, student navigation, and existing job search/card regression. The optional Python Playwright suite was not rerun because its Python package was unavailable in this environment; details are in `TEST_REPORT.md`.
+
+## Phase 2, Step 2.2 — student dashboard and profile foundation
+
+### Scope and constraints
+The Step 2.2 work keeps the existing homepage, guest browsing, and job-explorer flows intact. The student dashboard and profile page are front-end only and rely on the browser's existing local demo profile and bookmark storage. No real password storage, backend account system, or application pipeline is introduced.
+
+### Student portal behaviour
+- `#student-shell` is a dedicated dashboard/profile area that sits inside the same single-page app and reuses the same `nexora:demo-profile` and `nexora:demo-saved` localStorage keys already used elsewhere in the project.
+- Dashboard rendering is based on the demo profile data only: name, completion percentage, and overview fields are shown when present; missing fields degrade gracefully to “Not provided”.
+- Saved Jobs is a mirror of the bookmark list, so changes in the job explorer update the student dashboard immediately.
+- My Applications stays empty and clearly explains that real application tracking is intentionally not implemented yet.
+- Navigation between Dashboard, Profile and Explore Jobs is handled in the same front-end shell, without adding a framework or new backend.
+
+### Validation notes
+This phase was validated with static JavaScript syntax checking (`node --check assets/js/main.js`). No browser automation was run in this environment, so the Step 2.2 UI should be considered static-validated rather than browser-tested until a Playwright/Chromium environment is available.
+
 ## Architecture
 ```
 index.html                 Markup + SVG icon sprite + the single shared <dialog id="dialog">

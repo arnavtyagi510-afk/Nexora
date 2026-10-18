@@ -1,10 +1,39 @@
-# NEXORA — Step 1.3 (job details and application flow)
+# NEXORA — Phase 3, Step 3.1 (recruiter portal foundation)
 
-NEXORA is a career-tech platform for students, freshers, and job seekers. This ZIP is the complete Phase 1, Step 1.3 build: the design system and homepage, working search, filters, sorting, informative job cards and persistent bookmarks (Steps 1 and 1.2), plus a full job-details view and an honest application flow (Step 1.3).
+NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 3.1 highlights
+
+- A separate recruiter dashboard and **My Job Listings** page with total, active (marked Published locally), and draft counts based only on saved recruiter records.
+- Create and edit local listing drafts with title, company, description, location, job type, work mode, required skills, optional official application URL, and Draft / Published / Closed status.
+- Delete requires browser confirmation. Required fields are validated, and application URLs must be HTTP(S) without embedded credentials.
+- Listings use a separate `nexora:demo-recruiter-listings` localStorage key; no recruiter account, backend, public publishing, employer verification, or public job-explorer integration is claimed.
+- Recruiter navigation stays separate from the student portal and links back to the main job explorer. User-entered listing text is escaped before it is rendered.
+- The established forest-green and ivory design, guest browsing, student experience, and existing demo opportunities remain intact.
+
+## Phase 2.2 highlights
+
+- Student dashboard with a welcome message and profile completion meter based on locally stored demo profile data.
+- Student profile page with editable fields: name, headline, education, college, graduation year, career interests, desired roles, work modes, preferred locations, skills, GitHub and portfolio links.
+- Save-and-sync flow uses the existing `nexora:demo-profile` browser-local structure and reuses the same bookmark list as the job explorer.
+- Dashboard cards for Saved Jobs, My Applications and Profile Overview use truthful empty states where features are not backed by a real backend.
+- Skills and projects from Step 2.3 remain locally saved, user-managed profile data with no verification claims.
+
+This is a demo-only frontend experience. No real backend auth, password storage, recruiter verification, job publishing, or application tracking is claimed.
 
 ## Tech stack
 
 Plain **HTML + CSS + JavaScript**. There is no `package.json`, no build step, no framework, no backend, and nothing to install.
+
+## Validation status
+
+Actual validation performed:
+- Static JavaScript validation: `node --check assets/js/main.js` passed.
+- Python standard-library HTML parsing found no duplicate element IDs in `index.html`.
+- Integrated browser automation against a local HTTP server exercised recruiter required-field validation, unsafe URL rejection, draft creation, safe rendering, reload persistence, edit/status counts, published-state disclosure, and confirmed deletion.
+- Integrated browser regression checks confirmed student dashboard/profile navigation and that the six existing job cards and keyword search still work.
+
+The existing optional Python Playwright regression suite was not run in this environment because the Python Playwright package is unavailable. Earlier Step 1.3 test results documented below are historical results, not a fresh full-suite run for this change.
 
 ## How to run
 
@@ -23,6 +52,19 @@ npx serve .                      # only if you already use Node; nothing is inst
 An internet connection is only needed for the Google Font (Plus Jakarta Sans). Offline, the page falls back to the system font and still works.
 
 ## How to try the new features by hand (3 minutes)
+
+### Demo authentication and onboarding (Step 2.1)
+
+- Open the page and use **Sign In** or **Get Started** in the header or mobile menu. This is a browser-only demo flow: it validates form fields, shows password visibility toggles, and stores non-sensitive profile data in the visitor's local browser storage. It does not create a secure real account or send reset emails.
+- On **Get Started** you create a demo profile, then a four-step student onboarding experience appears. Required fields are validated before you can continue, and optional links are only accepted if they use `http` or `https`.
+- A **Reset demo profile data** button clears the locally saved onboarding data. The job explorer remains available as the guest experience, and users can return to browsing at any time without losing the search/filter state in the list.
+
+### Recruiter portal (Step 3.1)
+
+- Choose **Recruiter** in the site menu to open the separate recruiter workspace; it does not require or create an account.
+- Create a listing, enter the required fields, and choose **Save draft**. Reopen the portal or reload the page to see that it persists in this browser.
+- Edit a listing to set Draft, Published, or Closed. Published is only a local demo status and does not make a job available to job seekers.
+- Delete asks for confirmation. Recruiter records are independent of the central demo job data and existing bookmarks.
 
 1. Open `index.html` and click **View details** on any card. The dialog shows that job's own data, a **Demo listing** badge, and plain wording that it is fictional. Use the **X**, the **Close** button, **Escape**, or a click outside to close. Your search and filters are untouched, and focus returns to the card.
 2. In the dialog click **Apply Now**. For these demo listings you get a friendly explanation that it is sample data and cannot accept an application. You stay on NEXORA and nothing is sent or saved.
