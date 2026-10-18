@@ -9,12 +9,28 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
-## Phase 3, Step 3.1 — Recruiter Portal Foundation
+## Phase 3, Step 3.2 — Recruiter Job Publishing & Management
+
+### Scope, storage, and truthfulness
+- Extends the Step 3.1 recruiter portal in the existing single-page app. Recruiter listings remain separate from the student profile and use `nexora:demo-recruiter-listings`.
+- Listing records include title, company, description, required skills, location, work mode, job type, eligibility, experience, deadline, optional salary range and optional official application URL, plus status and timestamps.
+- Statuses are Draft, Published, Unpublished and Closed. Dashboard counts use normalized stored records. Search matches title/company and the status selector filters the same list.
+- Only Published recruiter records are mapped into the existing Job Explorer, with stable negative IDs and the recruiter-entered job details. Inactive records are removed when listings refresh; stale application records retain their own saved title/company snapshot.
+- Recruiter job bookmarks are retained while a listing is Unpublished or Closed and reattach to the same job when republished. Deleting a listing removes it from explorer results; student profile/application records remain independent.
+- Form validation covers required fields, future/current deadlines, salary range, and optional HTTP(S) application URLs without embedded credentials. Save as Draft, Preview and Publish retain form data when validation fails.
+- Details never fabricate an external application URL. A recruiter listing without a usable URL explains this and disables Apply Now. Student application tracking remains manually maintained; external Apply Now does not submit or record an application automatically.
+
+### Demo limitations and validation
+- "Published" means visible only in the current browser's Job Explorer. Listings are not shared, hosted, recruiter-verified, or connected to a server. There are no real recruiter accounts or employer responses.
+- Integrated-browser checks covered draft/preview/publish, public explorer integration, detail fields, edit without duplication, status transitions, listing search/filter, explorer search/filter/sort, bookmark retention/reattachment (including toggling another job while a recruiter listing is inactive), refresh persistence, delete confirmation, student-data preservation, invalid required fields/date/URL, no-URL messaging, malformed storage handling, and 390px navigation/layout.
+- `node --check assets/js/main.js` and the Python standard-library HTML parser / duplicate-ID check passed. The optional `tests/regression_test.py` could not start because Python `playwright` is not installed.
+
+## Phase 3, Step 3.1 — Recruiter Portal Foundation (initial scope)
 
 ### Scope and storage
 - The recruiter tools live in a separate portal shell in the existing single-page HTML/CSS/JS application. They do not replace or share student profile data.
 - Recruiter listings are saved in the current browser under `nexora:demo-recruiter-listings`; no records are seeded. Create, edit, delete, and reload operate only on this local demo list.
-- No recruiter identity, account, password, company verification, backend, or public listing endpoint exists. A record marked **Published** is only marked Published in this browser; it is never added to `NEXORA_DEMO.opportunities` or the public job explorer.
+- No recruiter identity, account, password, company verification, backend, or public listing endpoint exists. At the Step 3.1 stage, Published was a local status only; Step 3.2 now adds same-browser Job Explorer integration, not server publishing.
 - Dashboard counts come from actual stored records: Total includes all valid records, Active counts status `Published` (displayed as a local demo status only), and Draft counts `Draft`. Closed records count toward Total, not Active or Draft.
 
 ### Recruiter portal behaviour
@@ -22,7 +38,7 @@ Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F
 - Listing fields: title, company, description, location, job type, work mode, required skills, optional application URL, status, and `updatedAt`.
 - Required fields are checked before saving. Optional application URLs allow only HTTP(S), a hostname, and no embedded credentials. User-entered text is HTML-escaped in listing cards.
 - Delete requires native browser confirmation. Storage read/write errors are announced rather than presented as successful operations. A `storage` event refreshes the listing counts and views across same-origin tabs.
-- Empty states do not imply listings exist, and published-status notices state that the record is not public or verified.
+- Empty states do not imply listings exist. Published-status disclosures still state that records are not shared or verified.
 
 ### Validation notes
 The Step 3.1 flows were exercised in the integrated browser against a local HTTP server, including create/draft persistence, editing/status counts, URL and required-field validation, safe rendering, deletion confirmation, student navigation, and existing job search/card regression. The optional Python Playwright suite was not rerun because its Python package was unavailable in this environment; details are in `TEST_REPORT.md`.

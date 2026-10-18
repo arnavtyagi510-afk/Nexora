@@ -1,5 +1,31 @@
 # NEXORA — Test Report
 
+## Phase 3, Step 3.2 — recruiter job publishing & management
+
+### Checks performed
+
+Integrated-browser checks were run against the local `file://` app. Temporary profile, bookmark and recruiter-listing fixtures were restored after the checks.
+
+- Created a complete recruiter listing, previewed it, saved it as Draft, previewed the saved record, and published it. Confirmed Published listings appeared in the existing Job Explorer and that recruiter-entered description, eligibility and skills appeared in job details.
+- Edited a published listing and confirmed the existing record changed without a duplicate. Unpublished and closed listings disappeared from active explorer results; a closed listing could be reopened and published again.
+- Confirmed listing edits/status persisted after reload. Tested Job Explorer search, type filter and sort, plus recruiter title/company search and status filter.
+- Bookmarked a recruiter job, unpublished it, and confirmed the bookmark remained saved and reattached after republishing. A follow-up also toggled a different base-job bookmark while the recruiter job was inactive; the recruiter bookmark remained saved and reattached after reload. Saved-ID cleanup in both `refreshPublishedJobs()` and the bookmark-toggle path now retains IDs for existing recruiter records.
+- Closed and deleted a recruiter listing referenced by a student application; the application retained its saved title/company snapshot. Student profile, skill, project and application data remained intact after recruiter deletion.
+- Accepted the browser confirmation prompts for unpublish, close and delete. Delete removed the saved recruiter record.
+- Required-field validation marked empty fields invalid. A `javascript:` URL and a past deadline were rejected while entered form values remained. A published listing without an application URL showed the missing-link explanation and disabled Apply Now.
+- At 390px, the mobile menu opened the recruiter portal, navigation worked, and the page had no horizontal overflow.
+- Malformed recruiter-listing JSON displayed an explicit unavailable state with unknown counts (`—`) rather than a success-shaped empty list; the independent profile and bookmark fixtures were restored.
+- Opened Apply Now on a recruiter listing with a supplied external URL and confirmed the review step appeared; no external submission was made.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parsing of `index.html` — PASS; no duplicate IDs.
+
+### Failures and remaining checks
+
+- The initial bookmark regression check failed: unpublishing removed the recruiter job from `allJobs`, and saved-ID cleanup discarded bookmarks for inactive recruiter listings. Cleanup in both refresh and bookmark-toggle paths now retains those IDs; unpublish/republish and toggling another bookmark while inactive passed in follow-up checks.
+- `python tests\regression_test.py` could not start because the `playwright` package is unavailable (`ModuleNotFoundError`). The interactive checks above are integrated-browser checks, not a run of that automated suite.
+- No physical-device, cross-browser, keyboard-only or screen-reader testing was performed.
+- No backend sharing, real recruiter identity/verification, employer responses, or real application submission can be validated; those features do not exist.
+
 ## Demo profile and My Applications tracker — current change
 
 ### Integrated-browser checks performed

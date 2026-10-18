@@ -1,5 +1,30 @@
 # NEXORA — Progress
 
+## Phase 3, Step 3.2 — Recruiter Job Publishing & Management — STATUS: COMPLETE (browser-local demo scope)
+
+### Features implemented
+- Extended the existing recruiter form to manage title, company, description, skills, location, work mode, job type, eligibility, experience, deadline, optional salary range, and optional official HTTP(S) application URL.
+- Added Save as Draft, Preview, Publish, edit, unpublish, close, reopen & publish, and confirmed delete workflows. Dashboard counts and listing status/date display use saved listing data.
+- Added title/company search and status filtering. Only Published recruiter listings enter the existing student Job Explorer; Draft, Unpublished, and Closed records are excluded.
+- Recruiter-entered details flow into job cards and details. Missing external application links are explained and Apply Now is disabled; no link or application status is invented.
+- Preserved recruiter bookmarks across inactive status changes and reattached them on republish. Application records keep their own title/company snapshot when the referenced listing closes or is deleted.
+- Corrected edit/preview handling for the publish button and fixed saved-ID cleanup in both published-job refresh and bookmark-toggle flows so inactive recruiter bookmarks survive and reattach.
+
+### Files changed
+`assets/js/main.js`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse and duplicate-ID check — PASS.
+- Integrated browser checks — PASS: create/save draft/preview/publish; explorer visibility; details and external apply review; edit without duplicate; unpublish/close/reopen; search/status filter/sort; persistence; bookmark retention and reattachment (including toggling a different bookmark while recruiter job is inactive); application snapshot preservation; deletion confirmation; invalid required fields, unsafe URL and past deadline; missing-URL disclosure; malformed recruiter-storage handling; and mobile recruiter navigation with no horizontal overflow at 390px.
+- Student profile, skills, projects and application data were preserved through recruiter close/delete operations.
+- `python tests\regression_test.py` could not start because Python Playwright is not installed (`ModuleNotFoundError`).
+
+### Known limitations
+- Recruiter records and publication are local to this browser and are not shared or hosted; there is no recruiter authentication, verification, employer response sync or backend.
+- Job Explorer integration is local demo publishing only. External application submission is not performed; application records remain student-maintained.
+- No physical-device, cross-browser, keyboard-only or screen-reader test was performed.
+
 ## Phase 3, Step 3.1 — Recruiter Portal Foundation — STATUS: COMPLETE (frontend demo scope)
 
 ### Features implemented

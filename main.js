@@ -697,11 +697,15 @@
       return {
         id: String(item.id || "application_legacy_" + index),
         jobId: item.jobId === null || item.jobId === undefined ? "" : String(item.jobId).trim(),
+        recruiterListingId: String(item.recruiterListingId || "").trim(),
+        candidateId: String(item.candidateId || source.profileId || "").trim(),
         jobTitle: String(item.jobTitle || "").trim(),
         companyName: String(item.companyName || "").trim(),
         applicationDate: String(item.applicationDate || "").trim(),
         methodSource: String(item.methodSource || "").trim(),
         status: status,
+        recruiterStatus: studentApplicationStatuses.indexOf(String(item.recruiterStatus || "")) !== -1 ? String(item.recruiterStatus) : "",
+        recruiterUpdatedAt: String(item.recruiterUpdatedAt || "").trim(),
         notes: String(item.notes || "").trim(),
         createdAt: String(item.createdAt || "").trim(),
         updatedAt: String(item.updatedAt || "").trim(),
@@ -712,6 +716,7 @@
     }) : [];
 
     return {
+      profileId: String(source.profileId || "").trim(),
       fullName: String(source.fullName || "").trim(),
       headline: String(source.headline || "").trim(),
       educationLevel: String(source.educationLevel || "").trim(),
@@ -948,7 +953,8 @@
         '<div class="student-application-item__heading"><strong>' + escapeHtml(application.jobTitle) + '</strong><span class="student-application-status">' + escapeHtml(application.status) + '</span></div>' +
         '<span class="student-item__meta">' + escapeHtml(application.companyName) + ' · ' + escapeHtml(formatStudentApplicationDate(application.applicationDate)) + '</span>' +
         '<span class="student-item__meta">Method/source: ' + escapeHtml(application.methodSource || "Not provided") + '</span>' +
-        '<span class="student-item__meta">Status entered by you · not synced with an employer</span>' +
+        '<span class="student-item__meta">Your status: entered by you · not synced with an employer</span>' +
+        (application.recruiterStatus ? '<span class="student-item__meta">Recruiter demo status: ' + escapeHtml(application.recruiterStatus) + (application.recruiterUpdatedAt ? ' · updated ' + escapeHtml(formatStudentApplicationDate(application.recruiterUpdatedAt.slice(0, 10))) : '') + ' · local only</span>' : '') +
         (application.notes ? '<p class="student-application-item__notes">' + escapeHtml(application.notes) + '</p>' : '') +
       '</div>' +
       '<div class="student-application-item__actions">' +
@@ -1230,8 +1236,25 @@
       notes: document.getElementById("student-application-notes").value.trim(),
       createdAt: "",
       updatedAt: new Date().toISOString(),
-      statusSource: "student"
+      statusSource: "student",
+      candidateId: normalized.profileId || "",
+      recruiterListingId: ""
     };
+    var selectedJob = record.jobId ? allJobs.filter(function (job) { return String(job.id) === record.jobId; })[0] : null;
+    if (selectedJob && selectedJob.recruiterListingId) record.recruiterListingId = selectedJob.recruiterListingId;
+    var existingApplication = studentApplicationDraftId && normalized.applications.find(function (application) { return application.id === studentApplicationDraftId; });
+    if (existingApplication) {
+      record.recruiterListingId = existingApplication.recruiterListingId || record.recruiterListingId;
+      record.candidateId = existingApplication.candidateId || record.candidateId;
+      record.recruiterStatus = existingApplication.recruiterStatus;
+      record.recruiterUpdatedAt = existingApplication.recruiterUpdatedAt;
+    }
+    if (!profile.profileId) {
+      profile.profileId = "candidate_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      record.candidateId = profile.profileId;
+    } else if (!record.candidateId) {
+      record.candidateId = profile.profileId;
+    }
     var duplicate = findDuplicateStudentApplication(normalized, record, studentApplicationDraftId);
     if (duplicate) {
       setStudentApplicationMessage("This job already has an application record. Edit that record instead of creating a duplicate.", true);
@@ -1243,7 +1266,7 @@
       return;
     }
     if (studentApplicationDraftId) {
-      var original = normalized.applications.find(function (application) { return application.id === studentApplicationDraftId; });
+      var original = existingApplication;
       record.createdAt = original ? original.createdAt : "";
       normalized.applications = normalized.applications.map(function (application) {
         return application.id === studentApplicationDraftId ? record : application;
@@ -1667,28 +1690,33 @@
     };
   }
 
+  function recruiterJobIds(listings, baseJobs) {
+    var usedIds = {};
+    var ids = {};
+    (baseJobs || []).forEach(function (job) { usedIds[job.id] = true; });
+    listings.slice().sort(function (a, b) { return a.id.localeCompare(b.id); }).forEach(function (listing) {
+      ids[listing.id] = recruiterJobId(listing.id, usedIds);
+    });
+    return ids;
+  }
+
   function getPublishedRecruiterJobs(baseJobs) {
     var listings = readRecruiterListings();
     if (!listings) return [];
-    var usedIds = {};
-    (baseJobs || []).forEach(function (job) { usedIds[job.id] = true; });
+    var ids = recruiterJobIds(listings, baseJobs);
     return listings.filter(function (listing) { return listing.status === "Published"; })
-      .sort(function (a, b) { return a.id.localeCompare(b.id); })
-      .map(function (listing) { return recruiterListingToJob(listing, recruiterJobId(listing.id, usedIds)); });
+      .map(function (listing) { return recruiterListingToJob(listing, ids[listing.id]); });
   }
 
   function cleanSavedJobIds(raw, jobs) {
     var cleaned = Jobs.cleanSavedIds(raw, jobs);
     var listings = readRecruiterListings();
     if (!Array.isArray(raw) || !listings) return cleaned;
-    var usedIds = {};
-    (baseJobs || []).forEach(function (job) { usedIds[job.id] = true; });
-    var recruiterIds = {};
-    listings.forEach(function (listing) {
-      recruiterIds[recruiterJobId(listing.id, usedIds)] = true;
-    });
+    var recruiterIds = recruiterJobIds(listings, baseJobs);
+    var knownIds = {};
+    Object.keys(recruiterIds).forEach(function (listingId) { knownIds[recruiterIds[listingId]] = true; });
     raw.forEach(function (id) {
-      if (typeof id === "number" && isFinite(id) && Math.floor(id) === id && recruiterIds[id] && cleaned.indexOf(id) === -1) cleaned.push(id);
+      if (typeof id === "number" && isFinite(id) && Math.floor(id) === id && knownIds[id] && cleaned.indexOf(id) === -1) cleaned.push(id);
     });
     return cleaned;
   }
@@ -1838,6 +1866,7 @@
 
   function openRecruiterListingEditor(listingId) {
     resetRecruiterForm();
+    var publishButton = document.getElementById("recruiter-save-listing");
     if (listingId) {
       var listings = readRecruiterListings();
       var listing = listings && listings.find(function (item) { return item.id === listingId; });
@@ -2303,7 +2332,7 @@
   function refreshPublishedJobs() {
     allJobs = baseJobs.concat(getPublishedRecruiterJobs(baseJobs));
     support = Jobs.sortSupport(allJobs);
-    saved = Jobs.cleanSavedIds(saved, allJobs);
+    saved = cleanSavedJobIds(saved, allJobs);
     buildControls();
     render();
     renderStudentDashboard();
@@ -2576,7 +2605,7 @@
      in the Saved-only view the list itself changes, so it is re-rendered. */
   function toggleSaved(id, quiet) {
     var latest = readStorage();                       /* pick up changes made in another tab before writing */
-    if (latest !== null) saved = Jobs.cleanSavedIds(latest, allJobs);
+    if (latest !== null) saved = cleanSavedJobIds(latest, allJobs);
     var idx = saved.indexOf(id);
     var adding = idx === -1;
     if (adding) saved.push(id); else saved.splice(idx, 1);
