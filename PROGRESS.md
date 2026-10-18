@@ -1,5 +1,31 @@
 # NEXORA — Progress
 
+## Phase 4, Step 4.2 — Project Defense & Skill Proof System — STATUS: COMPLETE (browser-local demo scope)
+
+### Features implemented
+- Added a student Project Defense route and project-card actions, with project eligibility based on saved description, technologies, and role.
+- Implemented six deterministic questions shown one at a time on architecture, implementation choices, technical challenges, debugging, trade-offs, and contribution. Prompts use only the saved project details and state that linked repositories are not inspected.
+- Persisted in-progress answers and completed sessions in the existing student profile storage. Added saved-session navigation, response review, restart confirmation, and refresh-safe drafts/results.
+- Added a transparent indicative summary based on response count and an explicitly stated simple response-length heuristic, with unanswered categories and review topics.
+- Added private-by-default completed sessions with explicit per-session recruiter share consent and revocation. Recruiters see only shared completed sessions; deleted projects retain a clearly identified saved snapshot.
+- Kept skill evidence Self-declared / Project-linked; assessment completion does not independently verify a skill. No AI provider, new storage key, or dependency was added.
+- Updated README and project context with same-browser storage, no-auth/no-AI, and no-independent-verification limitations.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated-browser checks — PASS: six project-personalized questions; single-question progress; answer and progress persistence through reload; response review, completion summary and unanswered topics; private-by-default candidate gate; explicit share and revocation; recruiter-visible shared Q&A and indicative summary; deleted-project history handling; unchanged project-linked skill evidence; 390px no-horizontal-overflow check.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS; 315 IDs, none duplicated.
+- `python tests\regression_test.py` — NOT RUN: could not start because Python Playwright is unavailable (`ModuleNotFoundError`).
+
+### Known limitations and remaining checks
+- This is browser-local demo state in the single `nexora:demo-profile`; it is not authenticated, server-backed, safely shareable across different users/devices, or tamper-proof.
+- Question generation is deterministic and only uses saved project fields. Repositories are not accessed, and no AI provider or independent assessment is configured.
+- The response summary uses counts and a simple disclosed answer-length heuristic; it is indicative practice feedback, not skill verification or hiring evidence.
+- No physical-device, cross-browser, keyboard-only, or screen-reader test was performed. Full optional Playwright regression suite remains unavailable until its dependency is installed.
+
 ## Phase 4, Step 4.1 — Company Verification & Trust Center — STATUS: COMPLETE (browser-local demo scope)
 
 ### Features implemented

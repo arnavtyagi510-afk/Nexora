@@ -491,6 +491,25 @@ body.is-modal { overflow: hidden; }
 .jv__report-form h3, .jv__report-form p { margin: 0; }
 .jv__report-form label { font-size: var(--text-sm); font-weight: 700; }
 .jv__report-form .select, .jv__report-form .input { width: 100%; }
+.defense-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-3); margin-bottom: var(--space-3); }
+.defense-panel { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); }
+.defense-panel h3 { margin-bottom: var(--space-2); }
+.defense-panel > label { display: block; margin-bottom: var(--space-2); font-weight: 700; }
+.defense-panel textarea { min-height: 9rem; padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); }
+.defense-review-list, .defense-results-list { display: grid; gap: var(--space-3); margin: var(--space-3) 0; padding-left: 1.5rem; }
+.defense-review-list > li { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow-wrap: anywhere; }
+.defense-review-list p { margin-top: var(--space-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.defense-history { margin-top: var(--space-4); padding: var(--space-3); }
+.defense-history-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); list-style: none; padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.defense-history-item > div { display: grid; gap: var(--space-1); min-width: 0; }
+.defense-share-control { margin-top: var(--space-4); padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); }
+.defense-share-control label { display: flex; align-items: flex-start; gap: var(--space-2); font-weight: 600; }
+.defense-share-control input { flex: 0 0 auto; margin-top: 0.25rem; accent-color: var(--color-primary); }
+.recruiter-shared-assessments { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.recruiter-shared-assessment { margin-top: var(--space-2); padding: var(--space-2); border-top: 1px solid var(--color-border); }
+.recruiter-shared-assessment summary { cursor: pointer; color: var(--color-primary); font-weight: 700; }
+.recruiter-shared-assessment li { margin-top: var(--space-2); overflow-wrap: anywhere; }
+.recruiter-shared-assessment p { margin-top: var(--space-1); overflow-wrap: anywhere; }
 @media (max-width: 30rem) {
   .jv__actions .btn { flex: 1 1 100%; }
   .jv__summary { grid-template-columns: 1fr; gap: 0; }
@@ -498,6 +517,12 @@ body.is-modal { overflow: hidden; }
   .student-application-item { flex-direction: column; }
   .student-application-item__actions { width: 100%; }
   .student-application-item__actions .btn { flex: 1 1 auto; }
+  .defense-picker { grid-template-columns: minmax(0, 1fr); }
+  .defense-picker > .btn { width: 100%; }
+  .student-project-item { flex-direction: column; }
+  .student-project-item__actions { width: 100%; flex-wrap: wrap; }
+  .student-project-item__actions .btn { flex: 1 1 auto; }
+  .defense-history-item { align-items: flex-start; flex-direction: column; }
   #student-profile-nudge { align-items: flex-start; flex-direction: column; }
   .recruiter-applicant__controls .field-group { flex-basis: 100%; }
 }

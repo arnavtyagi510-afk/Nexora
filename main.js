@@ -662,6 +662,52 @@
   var studentOverview = document.getElementById("student-profile-overview");
   var studentSkillDraftId = null;
   var studentProjectDraftId = null;
+  var activeDefenseSessionId = "";
+
+  function normalizeDefenseSessions(sessions) {
+    if (!Array.isArray(sessions)) return [];
+    return sessions.map(function (session, index) {
+      var item = session && typeof session === "object" && !Array.isArray(session) ? session : {};
+      var savedProject = item.project && typeof item.project === "object" ? item.project : {};
+      var questions = Array.isArray(item.questions) ? item.questions.slice(0, 6).map(function (question, questionIndex) {
+        var prompt = question && typeof question === "object" ? question : {};
+        return {
+          category: String(prompt.category || "Project explanation").slice(0, 60),
+          text: String(prompt.text || "").slice(0, 700),
+          answer: String(prompt.answer || "").slice(0, 3000)
+        };
+      }).filter(function (question) { return !!question.text; }) : [];
+      var status = item.status === "completed" && questions.length === 6 ? "completed" : "in-progress";
+      var result = item.result && typeof item.result === "object" ? item.result : {};
+      var normalizedSession = {
+        id: String(item.id || "defense_legacy_" + index),
+        projectId: String(item.projectId || savedProject.id || ""),
+        project: {
+          id: String(savedProject.id || item.projectId || ""),
+          title: String(savedProject.title || "").slice(0, 160),
+          description: String(savedProject.description || "").slice(0, 2000),
+          technologies: String(savedProject.technologies || "").slice(0, 500),
+          role: String(savedProject.role || "").slice(0, 500),
+          githubUrl: String(savedProject.githubUrl || "").slice(0, 500),
+          liveDemoUrl: String(savedProject.liveDemoUrl || "").slice(0, 500)
+        },
+        questions: questions,
+        currentIndex: Math.max(0, Math.min(Number(item.currentIndex) || 0, questions.length)),
+        status: status,
+        startedAt: String(item.startedAt || "").slice(0, 40),
+        completedAt: status === "completed" ? String(item.completedAt || "").slice(0, 40) : "",
+        shareWithRecruiters: status === "completed" && item.shareWithRecruiters === true,
+        result: {
+          strengths: Array.isArray(result.strengths) ? result.strengths.map(String).slice(0, 6) : [],
+          unanswered: Array.isArray(result.unanswered) ? result.unanswered.map(String).slice(0, 6) : [],
+          reviewTopics: Array.isArray(result.reviewTopics) ? result.reviewTopics.map(String).slice(0, 6) : [],
+          answeredCount: Math.max(0, Math.min(Number(result.answeredCount) || 0, 6))
+        }
+      };
+      if (status === "completed") normalizedSession.result = summarizeDefenseSession(normalizedSession);
+      return normalizedSession;
+    }).filter(function (session) { return session.questions.length > 0; }).slice(-30);
+  }
 
   function normalizeStudentProfile(profile) {
     var source = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {};
@@ -729,6 +775,7 @@
       skills: skills,
       projects: projects,
       applications: applications,
+      defenseSessions: normalizeDefenseSessions(source.defenseSessions),
       careerInterests: String(source.careerInterests || "").trim(),
       githubUrl: String(source.githubUrl || "").trim(),
       portfolioUrl: String(source.portfolioUrl || "").trim(),
@@ -753,7 +800,8 @@
     var viewMap = {
       dashboard: document.getElementById("student-dashboard-view"),
       profile: document.getElementById("student-profile-view"),
-      applications: studentApplicationsView
+      applications: studentApplicationsView,
+      defense: document.getElementById("student-defense-view")
     };
     studentViews.forEach(function (view) {
       if (!view) return;
@@ -767,7 +815,7 @@
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-pressed", String(active));
     });
-    studentShell.hidden = !(route === "dashboard" || route === "profile" || route === "applications");
+    studentShell.hidden = !(route === "dashboard" || route === "profile" || route === "applications" || route === "defense");
   }
 
   function studentFieldErrorMap(profileData) {
@@ -908,6 +956,8 @@
     list.innerHTML = profile.projects.map(function (project) {
       var technologies = project.technologies ? '<span class="student-evidence">Technologies: ' + escapeHtml(project.technologies) + '</span>' : '<span class="student-evidence">Technologies: Not provided</span>';
       var roleText = project.role ? '<span class="student-evidence">Role: ' + escapeHtml(project.role) + '</span>' : '<span class="student-evidence">Role: Not provided</span>';
+      var hasDefense = profile.defenseSessions.some(function (session) { return session.projectId === project.id && session.status === "completed"; });
+      var readyForDefense = !!(project.description && project.technologies && project.role);
       var links = [];
       if (project.githubUrl && isHttpUrl(project.githubUrl)) links.push('<a class="link" href="' + escapeHtml(project.githubUrl) + '" target="_blank" rel="noopener noreferrer">Repository link provided</a>');
       if (project.liveDemoUrl && isHttpUrl(project.liveDemoUrl)) links.push('<a class="link" href="' + escapeHtml(project.liveDemoUrl) + '" target="_blank" rel="noopener noreferrer">Live demo</a>');
@@ -918,15 +968,255 @@
           technologies +
           roleText +
           '<span class="student-evidence">Project added by student</span>' +
+          (hasDefense ? '<span class="student-evidence">Assessment completed · not independent skill verification</span>' : '') +
           (links.length ? '<div class="student-project-item__links">' + links.join("") + '</div>' : '') +
         '</div>' +
         '<div class="student-project-item__actions">' +
+          '<button class="btn btn--secondary" type="button" data-student-project-defense="' + escapeHtml(project.id) + '"' + (readyForDefense ? '' : ' disabled title="Add a description, technologies and role before preparing a defense"') + '>Prepare defense</button>' +
           '<button class="btn btn--text" type="button" data-student-project-edit="' + escapeHtml(project.id) + '" aria-label="Edit project ' + escapeHtml(project.title) + '">Edit</button>' +
           '<button class="btn btn--text" type="button" data-student-project-delete="' + escapeHtml(project.id) + '" aria-label="Delete project ' + escapeHtml(project.title) + '">Delete</button>' +
         '</div>' +
       '</li>';
     }).join("");
   }
+
+  function buildDefenseQuestions(project) {
+    var description = project.description.trim().replace(/\s+/g, " ").slice(0, 140);
+    var technologies = project.technologies.split(/[,;|]/).map(function (technology) { return technology.trim(); }).filter(Boolean).slice(0, 4).join(", ") || project.technologies;
+    var role = project.role.trim().replace(/\s+/g, " ").slice(0, 120);
+    var repoContext = project.githubUrl && isHttpUrl(project.githubUrl)
+      ? "A repository link is listed (" + new URL(project.githubUrl).hostname + "); NEXORA has not inspected it."
+      : "No repository link is listed.";
+    return [
+      { category: "Architecture", text: "Based on your project summary (“" + description + (description.length >= 140 ? "…" : "") + "”), how did you structure its main components and how do they work together?" },
+      { category: "Implementation choices", text: "You listed " + technologies + ". Why were these technologies appropriate for this project, and what did you implement with them?" },
+      { category: "Technical challenge", text: "What was a significant technical challenge in this project, and how did you approach solving it?" },
+      { category: "Debugging", text: "Describe a bug or unexpected behavior you encountered, how you investigated it, and what evidence showed your fix worked. " + repoContext },
+      { category: "Trade-offs", text: "What implementation or design trade-off did you make, and what alternative did you consider?" },
+      { category: "Individual contribution", text: "Your saved role is “" + role + "”. Which specific parts did you personally complete, and how would you explain your contribution to a reviewer?" }
+    ];
+  }
+
+  function summarizeDefenseSession(session) {
+    var answered = session.questions.filter(function (question) { return question.answer.trim(); });
+    var detailed = answered.filter(function (question) { return question.answer.trim().split(/\s+/).length >= 20; });
+    return {
+      answeredCount: answered.length,
+      strengths: [
+        "You submitted responses for " + answered.length + " of " + session.questions.length + " prompts.",
+        detailed.length
+          ? detailed.length + " response(s) included at least 20 words of explanation."
+          : "No response reached the simple 20-word detail indicator; consider adding more explanation where useful."
+      ],
+      unanswered: session.questions.filter(function (question) { return !question.answer.trim(); }).map(function (question) { return question.category; }),
+      reviewTopics: session.questions.filter(function (question) { return !question.answer.trim(); }).map(function (question) { return question.category; }).length
+        ? session.questions.filter(function (question) { return !question.answer.trim(); }).map(function (question) { return "Prepare an explanation for " + question.category.toLowerCase() + "."; })
+        : ["Consider practicing with concrete examples, decisions, and evidence from your own work."]
+    };
+  }
+
+  function saveDefenseProfile(profile, statusMessage) {
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      var status = document.getElementById("student-defense-status");
+      if (status) status.textContent = "Could not save the assessment in this browser. Check browser storage and try again.";
+      return false;
+    }
+    renderStudentProjectEditor();
+    renderStudentDefense();
+    if (typeof renderRecruiterApplicants === "function") renderRecruiterApplicants(getCurrentRecruiterListings());
+    var message = document.getElementById("student-defense-status");
+    if (message && statusMessage) message.textContent = statusMessage;
+    return true;
+  }
+
+  function defenseSessionById(profile, id) {
+    return profile.defenseSessions.find(function (session) { return session.id === id; }) || null;
+  }
+
+  function renderStudentDefense() {
+    var picker = document.getElementById("student-defense-project");
+    var historyList = document.getElementById("student-defense-history-list");
+    var activePanel = document.getElementById("student-defense-active");
+    var reviewPanel = document.getElementById("student-defense-review");
+    var resultPanel = document.getElementById("student-defense-result");
+    if (!picker || !historyList || !activePanel || !reviewPanel || !resultPanel) return;
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var previousValue = picker.value;
+    picker.innerHTML = '<option value="">Select a project</option>' + profile.projects.map(function (project) {
+      var ready = !!(project.description && project.technologies && project.role);
+      return '<option value="' + escapeHtml(project.id) + '"' + (ready ? '' : ' disabled') + '>' + escapeHtml(project.title) + (ready ? '' : ' (add description, technologies and role)') + '</option>';
+    }).join("");
+    if (profile.projects.some(function (project) { return project.id === previousValue; })) picker.value = previousValue;
+    historyList.innerHTML = profile.defenseSessions.length ? profile.defenseSessions.slice().reverse().map(function (session) {
+      var completedTime = Date.parse(session.completedAt);
+      var completedDate = session.completedAt && isFinite(completedTime) ? new Date(completedTime).toLocaleDateString() : "";
+      return '<li class="defense-history-item"><div><strong>' + escapeHtml(session.project.title || "Untitled project") + '</strong>' +
+        '<span class="student-item__meta">' + (session.status === "completed" ? "Assessment completed" : "In progress") +
+        (completedDate ? " · " + escapeHtml(completedDate) : "") +
+        (session.shareWithRecruiters ? " · Shared with recruiters in this browser" : " · Private") + '</span></div>' +
+        '<button class="btn btn--text" type="button" data-defense-open="' + escapeHtml(session.id) + '">' + (session.status === "completed" ? "Review" : "Continue") + '</button></li>';
+    }).join("") : '<li class="empty--compact"><p>No saved defense sessions yet. Choose a complete project above to begin.</p></li>';
+
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session && profile.defenseSessions.length) {
+      session = profile.defenseSessions[profile.defenseSessions.length - 1];
+      activeDefenseSessionId = session.id;
+    }
+    activePanel.hidden = true;
+    reviewPanel.hidden = true;
+    resultPanel.hidden = true;
+    if (!session) return;
+    if (session.status === "completed") {
+      renderDefenseResult(session);
+      resultPanel.hidden = false;
+      return;
+    }
+    if (session.currentIndex >= session.questions.length) {
+      renderDefenseReview(session);
+      reviewPanel.hidden = false;
+      return;
+    }
+    var question = session.questions[session.currentIndex];
+    document.getElementById("student-defense-progress").textContent = "Question " + (session.currentIndex + 1) + " of " + session.questions.length + " · " + question.category;
+    document.getElementById("student-defense-question-title").textContent = question.text;
+    document.getElementById("student-defense-answer").value = question.answer;
+    document.getElementById("student-defense-project-context").textContent = "Selected project: " + (session.project.title || "Project details saved at session start") + ". Project information and links are student-provided; repository contents were not inspected.";
+    activePanel.hidden = false;
+  }
+
+  function renderDefenseReview(session) {
+    var list = document.getElementById("student-defense-review-list");
+    list.innerHTML = session.questions.map(function (question) {
+      return '<li><strong>' + escapeHtml(question.category) + '</strong><p>' + escapeHtml(question.text) + '</p><p>' + escapeHtml(question.answer.trim() || "No response submitted.") + '</p></li>';
+    }).join("");
+  }
+
+  function renderDefenseResult(session) {
+    var result = summarizeDefenseSession(session);
+    document.getElementById("student-defense-strengths").innerHTML = result.strengths.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("");
+    document.getElementById("student-defense-unanswered").innerHTML = result.unanswered.length
+      ? result.unanswered.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("")
+      : "<li>All prompts received a response.</li>";
+    document.getElementById("student-defense-review-topics").innerHTML = result.reviewTopics.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("");
+    var share = document.getElementById("student-defense-share");
+    share.checked = session.shareWithRecruiters;
+    share.setAttribute("aria-describedby", "student-defense-result-disclaimer");
+  }
+
+  function startStudentDefense(projectId) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var project = profile.projects.find(function (item) { return item.id === projectId; });
+    var status = document.getElementById("student-defense-status");
+    if (!project || !project.description || !project.technologies || !project.role) {
+      if (status) status.textContent = "Choose a saved project with a description, technologies, and your role before starting.";
+      return;
+    }
+    var existing = profile.defenseSessions.slice().reverse().find(function (item) {
+      return item.projectId === project.id && item.status === "in-progress";
+    });
+    if (existing) {
+      activeDefenseSessionId = existing.id;
+      renderStudentDefense();
+      return;
+    }
+    var sessionId = "defense_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    var session = {
+      id: sessionId,
+      projectId: project.id,
+      project: {
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        technologies: project.technologies,
+        role: project.role,
+        githubUrl: project.githubUrl,
+        liveDemoUrl: project.liveDemoUrl
+      },
+      questions: buildDefenseQuestions(project).map(function (question) {
+        return { category: question.category, text: question.text, answer: "" };
+      }),
+      currentIndex: 0,
+      status: "in-progress",
+      startedAt: new Date().toISOString(),
+      completedAt: "",
+      shareWithRecruiters: false,
+      result: { strengths: [], unanswered: [], reviewTopics: [], answeredCount: 0 }
+    };
+    profile.defenseSessions.push(session);
+    activeDefenseSessionId = session.id;
+    saveDefenseProfile(profile, "Project Defense started. Your draft is saved in this browser.");
+  }
+
+  function saveDefenseAnswer(skip) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session || session.status !== "in-progress") return;
+    if (!skip) session.questions[session.currentIndex].answer = document.getElementById("student-defense-answer").value.slice(0, 3000);
+    session.currentIndex = Math.min(session.currentIndex + 1, session.questions.length);
+    saveDefenseProfile(profile, session.currentIndex === session.questions.length
+      ? "All questions are ready for review. Review answers before finishing."
+      : "Response saved in this browser.");
+  }
+
+  function finishStudentDefense() {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session || session.status !== "in-progress" || session.currentIndex < session.questions.length) return;
+    session.status = "completed";
+    session.completedAt = new Date().toISOString();
+    session.shareWithRecruiters = false;
+    session.result = summarizeDefenseSession(session);
+    saveDefenseProfile(profile, "Assessment completed and saved privately in this browser. You can opt in to sharing below.");
+  }
+
+  function setDefenseSharing(share) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session || session.status !== "completed") return;
+    session.shareWithRecruiters = share === true;
+    saveDefenseProfile(profile, session.shareWithRecruiters
+      ? "This completed session is now available in the local recruiter demo for your linked profile."
+      : "Sharing is turned off. Recruiters will no longer see this session in the local demo.");
+  }
+
+  function restartStudentDefense() {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session) return;
+    if (!window.confirm("Restart this session? Its current answers will be cleared.")) return;
+    session.questions.forEach(function (question) { question.answer = ""; });
+    session.currentIndex = 0;
+    session.status = "in-progress";
+    session.startedAt = new Date().toISOString();
+    session.completedAt = "";
+    session.shareWithRecruiters = false;
+    session.result = { strengths: [], unanswered: [], reviewTopics: [], answeredCount: 0 };
+    saveDefenseProfile(profile, "Session restarted. Answers cleared and session saved.");
+  }
+
+  var defenseStartButton = document.getElementById("student-defense-start");
+  if (defenseStartButton) defenseStartButton.addEventListener("click", function () {
+    startStudentDefense(document.getElementById("student-defense-project").value);
+  });
+  var defenseSaveAnswerButton = document.getElementById("student-defense-save-answer");
+  if (defenseSaveAnswerButton) defenseSaveAnswerButton.addEventListener("click", function () { saveDefenseAnswer(false); });
+  var defenseSkipButton = document.getElementById("student-defense-skip");
+  if (defenseSkipButton) defenseSkipButton.addEventListener("click", function () { saveDefenseAnswer(true); });
+  var defenseBackButton = document.getElementById("student-defense-back");
+  if (defenseBackButton) defenseBackButton.addEventListener("click", function () {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var session = defenseSessionById(profile, activeDefenseSessionId);
+    if (!session || !session.questions.length) return;
+    session.currentIndex = session.questions.length - 1;
+    saveDefenseProfile(profile, "You can review or update the last response.");
+  });
+  var defenseFinishButton = document.getElementById("student-defense-finish");
+  if (defenseFinishButton) defenseFinishButton.addEventListener("click", finishStudentDefense);
+  var defenseShareCheckbox = document.getElementById("student-defense-share");
+  if (defenseShareCheckbox) defenseShareCheckbox.addEventListener("change", function () { setDefenseSharing(defenseShareCheckbox.checked); });
+  var defenseRestartButton = document.getElementById("student-defense-restart");
+  if (defenseRestartButton) defenseRestartButton.addEventListener("click", restartStudentDefense);
 
   function calculateProfileCompletion(profile) {
     var p = normalizeStudentProfile(profile);
@@ -2279,6 +2569,27 @@
     if (isHttpUrl(candidate.githubUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.githubUrl) + '" target="_blank" rel="noopener noreferrer">GitHub profile link provided</a>');
     if (isHttpUrl(candidate.portfolioUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.portfolioUrl) + '" target="_blank" rel="noopener noreferrer">Portfolio link provided</a>');
     if (profileLinks.length) details.push('<p>' + profileLinks.join(" · ") + '</p>');
+    var sharedSessions = candidate.defenseSessions.filter(function (session) {
+      return session.status === "completed" && session.shareWithRecruiters;
+    });
+    if (sharedSessions.length) {
+      details.push('<div class="recruiter-shared-assessments"><strong>Project Defense sessions shared by the student</strong><p>Rule-based demo exercise; no AI or repository inspection. These indicative summaries do not independently verify skills, identity, or authorship.</p>' +
+        sharedSessions.map(function (session) {
+          var projectStillExists = candidate.projects.some(function (project) { return project.id === session.projectId; });
+          var summary = session.result && session.result.strengths.length ? session.result : summarizeDefenseSession(session);
+          return '<details class="recruiter-shared-assessment"><summary>' + escapeHtml(session.project.title || "Project Defense") + (projectStillExists ? "" : " · project no longer in profile") + '</summary>' +
+            (session.project.description ? '<p>' + escapeHtml(session.project.description) + '</p>' : '') +
+            '<p><strong>Role:</strong> ' + escapeHtml(session.project.role || "Not provided") + '</p>' +
+            '<p><strong>Technologies:</strong> ' + escapeHtml(session.project.technologies || "Not provided") + '</p>' +
+            '<ol>' + session.questions.map(function (question) {
+              return '<li><strong>' + escapeHtml(question.category) + ': ' + escapeHtml(question.text) + '</strong><p>' + escapeHtml(question.answer.trim() || "No response submitted.") + '</p></li>';
+            }).join("") + '</ol>' +
+            '<p><strong>Indicative summary:</strong> ' + escapeHtml(summary.strengths.join(" ")) + '</p>' +
+            '<p><strong>Unanswered:</strong> ' + escapeHtml(summary.unanswered.length ? summary.unanswered.join(", ") : "None") + '</p>' +
+            (summary.reviewTopics.length ? '<p><strong>Review topics:</strong> ' + escapeHtml(summary.reviewTopics.join(" ")) + '</p>' : '') +
+          '</details>';
+        }).join("") + '</div>');
+    }
     return details.length ? details.join("") : '<p>Candidate has not provided additional profile details.</p>';
   }
 
@@ -2937,6 +3248,24 @@
       if (route === "dashboard") renderStudentDashboard();
       if (route === "profile") loadStudentProfileIntoForm();
       if (route === "applications") renderStudentApplicationLists();
+      if (route === "defense") renderStudentDefense();
+      return;
+    }
+
+    var projectDefenseButton = event.target.closest("[data-student-project-defense]");
+    if (projectDefenseButton) {
+      showStudentRoute("defense");
+      renderStudentDefense();
+      var defensePicker = document.getElementById("student-defense-project");
+      defensePicker.value = projectDefenseButton.dataset.studentProjectDefense;
+      startStudentDefense(defensePicker.value);
+      return;
+    }
+
+    var savedDefenseButton = event.target.closest("[data-defense-open]");
+    if (savedDefenseButton) {
+      activeDefenseSessionId = savedDefenseButton.dataset.defenseOpen;
+      renderStudentDefense();
       return;
     }
 
@@ -3385,6 +3714,10 @@
     if (e.key === AUTH_PROFILE_KEY) {
       renderStudentDashboard();
       renderStudentApplicationLists();
+      renderStudentSkillEditor();
+      renderStudentProjectEditor();
+      renderStudentDefense();
+      renderRecruiterApplicants(getCurrentRecruiterListings());
       return;
     }
     if (e.key !== null && e.key !== SAVED_KEY) return;

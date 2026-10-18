@@ -9,6 +9,15 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
+## Phase 4, Step 4.2 — Project Defense & Skill Proof System
+
+- The student profile stores assessment records in the existing `nexora:demo-profile` object under `defenseSessions`. Each record has a project ID and safe project-detail snapshot, six question category/text/answer pairs, progress/status, completion time, student-controlled recruiter-sharing consent, and transparent computed summary. No separate assessment storage key or backend was added.
+- The rule-based question templates use the student's saved description, technologies, role, and whether a repository URL was supplied. No external AI provider or repository inspection exists. Draft sessions and answers persist, and project removal leaves a clearly marked historical session snapshot.
+- Completion summary uses response count and a disclosed 20-word response-length heuristic, identifies unanswered question categories, and suggests corresponding practice topics (or general evidence-based practice when all prompts were answered). It is indicative and does not judge skill, authorship, identity, or cheating.
+- Completed results are private unless the student explicitly opts in per session; consent can be revoked. Recruiter candidate details include only completed sessions still shared by that profile. This is a same-browser demo, not secure access control or cross-user/device sharing.
+- Existing skill evidence stays Self-declared or Project-linked. Completing a session does not upgrade any skill; Independently verified remains unavailable absent a real, documented verification process.
+- UI is part of the student portal and retains existing NEXORA colors/tokens. Inputs have associated labels/status regions; narrow-screen layout wraps session forms and project actions.
+
 ## Phase 4, Step 4.1 — Company Verification & Trust Center
 
 ### Local company profile and request

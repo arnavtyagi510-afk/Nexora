@@ -1,6 +1,16 @@
-# NEXORA — Phase 4, Step 4.1 (company trust center)
+# NEXORA — Phase 4, Step 4.2 (Project Defense)
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 4.2 highlights
+
+- Students can start a Project Defense from a sufficiently complete saved project or select one in the student portal. Six one-at-a-time prompts cover architecture, implementation choices, technical challenges, debugging, trade-offs, and individual contribution.
+- Prompts are deterministic/rule-based and interpolate only saved project details. Repository URLs are noted as student-provided; NEXORA does not inspect repositories or use a live AI provider.
+- Draft answers, progress, completed sessions, and a response summary are saved in the existing `nexora:demo-profile` record as `defenseSessions`; no new storage key or dependency was added. Empty answers are supported and appear as unanswered.
+- The summary reports response count, a plainly disclosed 20-word detail heuristic, unanswered topics, and review suggestions. It is indicative practice feedback, not an objective skill assessment or verification.
+- Completed results are private by default. A student can explicitly share or revoke sharing per session; only completed sessions with current sharing consent appear in the local recruiter candidate details. Recruiter display includes the selected project, prompts, answers, and transparent summary.
+- Skill evidence stays **Self-declared** or **Project-linked**. A defense completion is labeled as a completed assessment only; it never marks a skill Independently verified. If the project is later deleted, the saved session remains with a clear historical-project label.
+- Data is browser-local. It cannot safely share with other users, browsers, or devices, and there is no real AI, backend, identity check, independent repository inspection, or authenticated permission enforcement.
 
 ## Phase 4.1 highlights
 

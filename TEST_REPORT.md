@@ -1,5 +1,32 @@
 # NEXORA — Test Report
 
+# Phase 4, Step 4.2 — Project Defense & Skill Proof System
+
+### Integrated-browser checks performed
+
+Ran on the local `file://` page with temporary profile and recruiter-listing fixtures; the prior localStorage values were restored at the end of each run.
+
+- Selected a complete saved project and started a six-question rule-based defense. Verified that the first prompt incorporated saved project description and the prompt sequence was shown one at a time.
+- Submitted an answer and confirmed both the answer and the current question index were saved in the existing student profile. Reloaded the page and resumed at Question 2 of 6.
+- Submitted responses and skipped the final question; the review showed all six prompts, completion saved the session, and the summary identified the unanswered Individual contribution prompt.
+- Confirmed completed results were private by default and absent from recruiter candidate detail markup. Opted in to sharing, verified the recruiter view contained the selected project, questions, answers, and transparent indicative summary, then revoked sharing and confirmed the result was no longer exposed.
+- Tested a completed shared session after its project had been removed: the student could still review the saved session, and the recruiter view clearly labeled the project as no longer in the profile.
+- Confirmed a Project-linked skill remained Project-linked; assessment completion did not set independent verification.
+- At 390px viewport width, checked `documentElement.scrollWidth` against `clientWidth`; both were 375px and no horizontal overflow was present.
+
+### Static and automated checks
+
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parser — PASS; 315 IDs and no duplicates.
+- `python tests\regression_test.py` — NOT RUN: could not start because Python Playwright is unavailable (`ModuleNotFoundError: No module named 'playwright'`).
+
+### Test iteration notes and remaining checks
+
+- The first browser attempt targeted a hidden desktop navigation item at the integrated browser's mobile-sized viewport; reran using the visible mobile menu.
+- An initial test assertion incorrectly expected the project title in a question that correctly personalized from the saved description; corrected the assertion.
+- The review-flow test exposed a boundary clamp that prevented the review screen after Question 6. Fixed the progress normalization and reran the full session/share/revocation workflow successfully.
+- No physical-device, cross-browser, keyboard-only, or screen-reader testing was performed. The browser-local consent mechanism is a demo UI gate, not authenticated or tamper-proof access control.
+
 ## Phase 4, Step 4.1 — company verification, trust indicators, and job reports
 
 ### Integrated-browser checks performed

@@ -300,6 +300,7 @@
         <button type="button" class="student-shell__nav is-active" data-student-route="dashboard">Dashboard</button>
         <button type="button" class="student-shell__nav" data-student-route="profile">Profile</button>
         <button type="button" class="student-shell__nav" data-student-route="applications">My Applications</button>
+        <button type="button" class="student-shell__nav" data-student-route="defense">Project Defense</button>
         <button type="button" class="student-shell__nav" data-student-route="explore">Explore jobs</button>
       </aside>
 
@@ -339,6 +340,7 @@
               </div>
               <ul class="student-list" id="student-applications"></ul>
             </section>
+
           </div>
 
           <section class="student-card">
@@ -348,6 +350,68 @@
             </div>
             <div id="student-profile-overview" class="student-overview"></div>
           </section>
+        </section>
+
+        <section class="student-view" id="student-defense-view" hidden aria-labelledby="student-defense-title">
+          <div class="student-card student-card--wide">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Rule-based demo assessment</p>
+                <h2 id="student-defense-title">Project Defense</h2>
+              </div>
+            </div>
+            <p class="recruiter-notice">Questions use only project details you saved. No AI model or repository inspection is connected. Responses and the indicative summary are private by default. You choose whether to share a completed session with recruiters in this browser.</p>
+            <div class="defense-picker">
+              <div class="field-group">
+                <label for="student-defense-project">Choose a project to defend</label>
+                <select class="select" id="student-defense-project"></select>
+              </div>
+              <button class="btn btn--primary" type="button" id="student-defense-start">Prepare Project Defense</button>
+            </div>
+            <p class="auth-status" id="student-defense-status" role="status" aria-live="polite"></p>
+            <section id="student-defense-active" class="defense-panel" hidden aria-labelledby="student-defense-question-title">
+              <p class="student-banner__eyebrow" id="student-defense-progress">Question 1 of 6</p>
+              <h3 id="student-defense-question-title"></h3>
+              <p class="student-item__meta" id="student-defense-project-context"></p>
+              <label for="student-defense-answer">Your response</label>
+              <textarea class="input" id="student-defense-answer" rows="6" maxlength="3000" placeholder="Explain your thinking in your own words."></textarea>
+              <p class="student-item__meta">You may leave an answer empty; it will appear as unanswered in your review.</p>
+              <div class="student-form-controls">
+                <button class="btn btn--secondary" type="button" id="student-defense-save-answer">Save &amp; next</button>
+                <button class="btn btn--text" type="button" id="student-defense-skip">Skip question</button>
+              </div>
+            </section>
+            <section id="student-defense-review" class="defense-panel" hidden aria-labelledby="student-defense-review-title">
+              <h3 id="student-defense-review-title">Review your responses</h3>
+              <ol id="student-defense-review-list" class="defense-review-list"></ol>
+              <div class="student-form-controls">
+                <button class="btn btn--secondary" type="button" id="student-defense-back">Back to questions</button>
+                <button class="btn btn--primary" type="button" id="student-defense-finish">Finish assessment</button>
+              </div>
+            </section>
+            <section id="student-defense-result" class="defense-panel" hidden aria-labelledby="student-defense-result-title">
+              <h3 id="student-defense-result-title">Indicative response summary</h3>
+              <p class="recruiter-notice">This rule-based summary is indicative, not an objective measurement of skill. It does not verify identity, authorship, coding ability, or project claims.</p>
+              <p><strong>Strengths in your responses</strong></p>
+              <ul id="student-defense-strengths" class="defense-results-list"></ul>
+              <p><strong>Unanswered questions</strong></p>
+              <ul id="student-defense-unanswered" class="defense-results-list"></ul>
+              <p><strong>Topics you may want to review</strong></p>
+              <ul id="student-defense-review-topics" class="defense-results-list"></ul>
+              <div class="defense-share-control">
+                <label><input type="checkbox" id="student-defense-share"> Share this completed session with recruiters viewing my linked applicant profile in this browser</label>
+                <p class="student-item__meta">Sharing is optional and can be turned off at any time. This is same-browser demo sharing, not cross-device delivery.</p>
+              </div>
+              <div class="student-form-controls">
+                <button class="btn btn--secondary" type="button" id="student-defense-restart">Restart this session</button>
+                <button class="btn btn--text" type="button" data-student-route="profile">Return to Profile</button>
+              </div>
+            </section>
+            <section class="student-card defense-history" aria-labelledby="student-defense-history-title">
+              <h3 id="student-defense-history-title">Saved sessions</h3>
+              <ul id="student-defense-history-list" class="defense-review-list"></ul>
+            </section>
+          </div>
         </section>
 
         <section class="student-view" id="student-applications-view" hidden aria-labelledby="student-applications-title">
@@ -541,6 +605,7 @@
 
                 <div class="field-group field-group--full">
                   <label>Projects &amp; Proof of Work</label>
+                  <p class="student-item__meta">Projects and links are student-provided and not automatically verified. Skill labels remain Self-declared or Project-linked; completing Project Defense never marks a skill independently verified.</p>
                   <div class="student-project-editor">
                     <div class="student-form-grid">
                       <div class="field-group">
