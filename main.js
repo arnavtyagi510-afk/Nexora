@@ -853,18 +853,62 @@
     return options.indexOf(next) !== -1;
   }
 
+  function normalizeSkillVerificationStatus(value, hasEvidence) {
+    var allowed = [
+      "Self-Reported",
+      "Evidence Submitted",
+      "Under Review",
+      "Verified",
+      "Rejected / More Evidence Needed"
+    ];
+    var status = String(value || "").trim();
+    if (allowed.indexOf(status) !== -1) return status;
+    return hasEvidence ? "Evidence Submitted" : "Self-Reported";
+  }
+
+  function normalizeSkillEvidenceItems(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map(function (entry, index) {
+      var item = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
+      var url = String(item.url || item.link || "").trim();
+      var normalizedUrl = isHttpUrl(url) ? url : "";
+      var description = String(item.description || item.notes || "").trim();
+      var type = ["project", "github", "portfolio", "other"].indexOf(item.type) >= 0 ? item.type : (normalizedUrl ? "other" : "project");
+      if (!normalizedUrl && !description) return null;
+      return {
+        id: String(item.id || "skill_evidence_" + index),
+        type: type,
+        label: String(item.label || item.type || "Evidence").trim() || "Evidence",
+        url: normalizedUrl,
+        description: description,
+        submittedAt: String(item.submittedAt || "").trim(),
+        reviewedAt: String(item.reviewedAt || "").trim(),
+        reviewStatus: normalizeSkillVerificationStatus(item.reviewStatus || item.status, !!(normalizedUrl || description)),
+        reviewFeedback: String(item.reviewFeedback || "").trim()
+      };
+    }).filter(Boolean).slice(0, 12);
+  }
+
   function normalizeStudentProfile(profile) {
     var source = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {};
     var skills = Array.isArray(source.skills) ? source.skills.map(function (skill, index) {
       var item = skill && typeof skill === "object" && !Array.isArray(skill) ? skill : {};
       var name = String(typeof skill === "string" ? skill : item.name || item.skill || "").trim();
+      var evidenceItems = normalizeSkillEvidenceItems(Array.isArray(item.evidenceItems) ? item.evidenceItems : []);
+      var hasEvidence = evidenceItems.length > 0 || !!item.evidenceUrl || !!item.link || !!String(item.description || "").trim();
+      var status = normalizeSkillVerificationStatus(item.verificationStatus, hasEvidence);
       return {
         id: String(item.id || "skill_legacy_" + index),
         name: name,
         level: String(item.level || "").trim(),
         evidence: item.evidence === "project-linked" ? "project-linked" : "self-declared",
         projectId: String(item.projectId || "").trim(),
-        linkedProject: String(item.linkedProject || "").trim()
+        linkedProject: String(item.linkedProject || "").trim(),
+        evidenceItems: evidenceItems,
+        verificationStatus: status,
+        reviewFeedback: String(item.reviewFeedback || "").trim(),
+        reviewedAt: String(item.reviewedAt || "").trim(),
+        submittedAt: String(item.submittedAt || (evidenceItems[0] && evidenceItems[0].submittedAt) || "").trim()
       };
     }).filter(function (skill) { return !!skill.name; }) : [];
 
@@ -1077,12 +1121,101 @@
     }
   }
 
+  function skillVerificationExplanation(status) {
+    return {
+      "Self-Reported": "This skill is included in the profile without a submitted link, project evidence, or reviewer review. It is not treated as independently verified.",
+      "Evidence Submitted": "A link, project detail, or portfolio reference was added. This remains a student-submitted claim until a reviewer marks it under review or verified.",
+      "Under Review": "A local reviewer has opened this evidence for inspection. This state means the item has been reviewed in the demo process, not that it is automatically proven.",
+      "Verified": "A reviewer explicitly marked this skill as verified in the local demo workflow. It is still separate from other self-reported skills and can be reviewed again with new evidence.",
+      "Rejected / More Evidence Needed": "A reviewer asked for more supporting material or rejected the current evidence. The skill remains in the profile but requires additional context or a clearer example."
+    }[status] || "This skill is stored in the browser-local profile and is not automatically trusted or verified.";
+  }
+
+  function getSkillVerificationClass(status) {
+    return status === "Verified" ? "verified" : status === "Under Review" ? "under-review" : status === "Rejected / More Evidence Needed" ? "rejected" : "self-reported";
+  }
+
+  function renderSkillVerificationTag(status) {
+    var safeStatus = status || "Self-Reported";
+    return '<span class="student-skill-status student-skill-status--' + escapeHtml(getSkillVerificationClass(safeStatus)) + '">' + escapeHtml(safeStatus) + '</span>';
+  }
+
+  function populateSkillEvidenceSelect() {
+    var select = document.getElementById("student-skill-evidence-skill");
+    if (!select) return;
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var currentValue = select.value;
+    if (!profile.skills.length) {
+      select.innerHTML = '<option value="">No skills saved yet</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Choose a skill</option>' + profile.skills.map(function (skill) {
+      return '<option value="' + escapeHtml(skill.id) + '">' + escapeHtml(skill.name) + '</option>';
+    }).join("");
+    if (currentValue && profile.skills.some(function (skill) { return skill.id === currentValue; })) {
+      select.value = currentValue;
+    }
+  }
+
+  function setSkillEvidenceMessage(message, isError) {
+    var el = document.getElementById("student-skill-evidence-status");
+    if (el) el.textContent = message || "";
+    if (el) el.classList.toggle("field-error", !!(message && isError));
+    if (el) el.classList.toggle("auth-status", !(message && isError));
+  }
+
+  function clearSkillEvidenceForm() {
+    var skillSelect = document.getElementById("student-skill-evidence-skill");
+    var typeSelect = document.getElementById("student-skill-evidence-type");
+    var urlInput = document.getElementById("student-skill-evidence-url");
+    var descriptionInput = document.getElementById("student-skill-evidence-description");
+    if (skillSelect) skillSelect.value = "";
+    if (typeSelect) typeSelect.value = "project";
+    if (urlInput) urlInput.value = "";
+    if (descriptionInput) descriptionInput.value = "";
+    setSkillEvidenceMessage("");
+    renderStudentSkillEvidenceList();
+  }
+
+  function renderStudentSkillEvidenceList() {
+    var list = document.getElementById("student-skill-evidence-list");
+    if (!list) return;
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var skillId = document.getElementById("student-skill-evidence-skill") ? document.getElementById("student-skill-evidence-skill").value : "";
+    if (!skillId) {
+      list.innerHTML = '<li class="empty--compact"><h3>No skill selected</h3><p>Select a saved skill to add or review evidence.</p></li>';
+      return;
+    }
+    var skill = profile.skills.find(function (item) { return item.id === skillId; });
+    if (!skill) {
+      list.innerHTML = '<li class="empty--compact"><h3>Skill not found</h3><p>Please choose a different saved skill.</p></li>';
+      return;
+    }
+    var evidenceItems = Array.isArray(skill.evidenceItems) ? skill.evidenceItems : [];
+    if (!evidenceItems.length) {
+      list.innerHTML = '<li class="empty--compact"><h3>No evidence submitted yet</h3><p>Add a repository, portfolio, project link, or a short description for this skill.</p></li>';
+      return;
+    }
+    list.innerHTML = evidenceItems.map(function (entry) {
+      var evidenceText = entry.description ? escapeHtml(entry.description) : 'No description supplied.';
+      var urlHtml = entry.url ? '<a class="link" href="' + escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">Open evidence link</a>' : "";
+      return '<li class="student-item student-skill-evidence-entry"><div><strong>' + escapeHtml(entry.label || "Evidence") + '</strong><span class="student-item__meta">Status: ' + escapeHtml(skill.verificationStatus || "Self-Reported") + '</span>' +
+        '<span class="student-item__meta">' + evidenceText + '</span>' +
+        (entry.url ? '<span class="student-item__meta">' + urlHtml + '</span>' : '') +
+        (entry.reviewFeedback ? '<span class="student-item__meta">Reviewer feedback: ' + escapeHtml(entry.reviewFeedback) + '</span>' : '') +
+        '</div><div class="student-skill-item__actions"><button class="btn btn--text" type="button" data-student-skill-evidence-edit="' + escapeHtml(skill.id) + '" data-student-skill-evidence-item="' + escapeHtml(entry.id) + '">Edit</button>' +
+        '<button class="btn btn--text" type="button" data-student-skill-evidence-delete="' + escapeHtml(skill.id) + '" data-student-skill-evidence-item="' + escapeHtml(entry.id) + '">Remove</button></div></li>';
+    }).join("");
+  }
+
   function renderStudentSkillEditor() {
     var list = document.getElementById("student-skill-list");
     if (!list) return;
     var profile = normalizeStudentProfile(readDemoProfile());
     if (!profile.skills.length) {
       list.innerHTML = '<li class="empty--compact"><h3>No skills added yet</h3><p>List the skills you want employers to see.</p></li>';
+      populateSkillEvidenceSelect();
+      renderStudentSkillEvidenceList();
       return;
     }
 
@@ -1090,18 +1223,145 @@
       var levelText = skill.level ? '<span class="student-evidence">Level: ' + escapeHtml(skill.level) + '</span>' : '<span class="student-evidence">Level: Not set</span>';
       var evidence = skill.evidence === "project-linked" ? "Project-linked" : "Self-declared";
       var linkedProject = skill.projectId ? ' • linked to ' + escapeHtml(studentProjectNameById(skill.projectId)) : "";
+      var evidenceCount = Array.isArray(skill.evidenceItems) ? skill.evidenceItems.length : 0;
+      var verificationText = skill.verificationStatus || "Self-Reported";
       return '<li class="student-skill-item">' +
         '<div class="student-skill-item__meta">' +
           '<strong>' + escapeHtml(skill.name) + '</strong>' +
           (skill.level ? levelText : "") +
-          '<span class="student-evidence">Evidence: ' + escapeHtml(evidence) + linkedProject + '</span>' +
+          '<span class="student-evidence">Verification status: ' + escapeHtml(verificationText) + '</span>' +
+          '<span class="student-evidence">Evidence: ' + escapeHtml(evidence) + ' · ' + evidenceCount + ' item(s)' + linkedProject + '</span>' +
+          (Array.isArray(skill.evidenceItems) && skill.evidenceItems.length ? '<span class="student-evidence">' + escapeHtml(skillVerificationExplanation(verificationText)) + '</span>' : '') +
         '</div>' +
         '<div class="student-skill-item__actions">' +
           '<button class="btn btn--text" type="button" data-student-skill-edit="' + escapeHtml(skill.id) + '" aria-label="Edit skill ' + escapeHtml(skill.name) + '">Edit</button>' +
+          '<button class="btn btn--text" type="button" data-student-skill-evidence-edit="' + escapeHtml(skill.id) + '" aria-label="Manage evidence for ' + escapeHtml(skill.name) + '">Evidence</button>' +
           '<button class="btn btn--text" type="button" data-student-skill-delete="' + escapeHtml(skill.id) + '" aria-label="Remove skill ' + escapeHtml(skill.name) + '">Remove</button>' +
         '</div>' +
       '</li>';
     }).join("");
+    populateSkillEvidenceSelect();
+    renderStudentSkillEvidenceList();
+  }
+
+  function validateSkillEvidenceForm(skillId, type, url, description) {
+    if (!skillId) return "Select a saved skill before adding evidence.";
+    if (!url && !description.trim()) return "Add a link, a project reference, or a short description before saving evidence.";
+    if (url && !isHttpUrl(url)) return "Use a valid http(s) URL for the evidence link.";
+    if (type === "github" && url && !/github\.com\//i.test(url)) {
+      return "GitHub evidence should point to a GitHub repository or profile URL.";
+    }
+    if (type === "portfolio" && url && !/portfolio|behance|dribbble|medium|dev\.to|notion|linkedin|github/i.test(url)) {
+      return "Portfolio evidence should be a web URL for a portfolio, project, or public work sample.";
+    }
+    if (description && description.length > 1400) return "Evidence descriptions should be shorter than 1400 characters.";
+    return "";
+  }
+
+  function saveSkillEvidenceToProfile() {
+    var skillSelect = document.getElementById("student-skill-evidence-skill");
+    var typeSelect = document.getElementById("student-skill-evidence-type");
+    var urlInput = document.getElementById("student-skill-evidence-url");
+    var descriptionInput = document.getElementById("student-skill-evidence-description");
+    if (!skillSelect || !typeSelect || !urlInput || !descriptionInput) return;
+    var skillId = skillSelect.value;
+    var evidenceType = typeSelect.value || "project";
+    var url = urlInput.value.trim();
+    var description = descriptionInput.value.trim();
+    var error = validateSkillEvidenceForm(skillId, evidenceType, url, description);
+    if (error) {
+      setSkillEvidenceMessage(error, true);
+      return;
+    }
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var skill = profile.skills.find(function (item) { return item.id === skillId; });
+    if (!skill) {
+      setSkillEvidenceMessage("That skill is no longer available in this profile.", true);
+      return;
+    }
+    var evidenceEntry = {
+      id: "skill_evidence_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      type: evidenceType,
+      label: evidenceType === "github" ? "GitHub repository" : evidenceType === "portfolio" ? "Portfolio" : evidenceType === "project" ? "Project link" : "External evidence",
+      url: url,
+      description: description,
+      submittedAt: new Date().toISOString(),
+      reviewedAt: "",
+      reviewStatus: "Evidence Submitted",
+      reviewFeedback: ""
+    };
+    var evidenceEntryId = document.getElementById("student-skill-evidence-item") ? document.getElementById("student-skill-evidence-item").value : "";
+    if (evidenceEntryId) {
+      var existingEntry = skill.evidenceItems.find(function (item) { return item.id === evidenceEntryId; });
+      if (existingEntry) {
+        evidenceEntry = {
+          id: existingEntry.id,
+          type: evidenceType,
+          label: evidenceEntry.label,
+          url: url,
+          description: description,
+          submittedAt: existingEntry.submittedAt || new Date().toISOString(),
+          reviewedAt: existingEntry.reviewedAt || "",
+          reviewStatus: existingEntry.reviewStatus || "Evidence Submitted",
+          reviewFeedback: existingEntry.reviewFeedback || ""
+        };
+      }
+    }
+    skill.evidenceItems = Array.isArray(skill.evidenceItems) ? skill.evidenceItems.filter(function (item) { return item.id !== evidenceEntry.id; }) : [];
+    skill.evidenceItems.push(evidenceEntry);
+    skill.submittedAt = skill.submittedAt || new Date().toISOString();
+    skill.verificationStatus = "Evidence Submitted";
+    skill.reviewFeedback = "";
+    skill.reviewedAt = "";
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      setSkillEvidenceMessage("Could not save this evidence in this browser. Check local storage settings and try again.", true);
+      return;
+    }
+    setStudentStatus("Skill evidence saved in this browser-local profile. Review status remains pending until a reviewer updates it.");
+    setSkillEvidenceMessage("Evidence saved. It will appear as Evidence Submitted until a reviewer updates its status.", false);
+    clearSkillEvidenceForm();
+    renderStudentSkillEditor();
+  }
+
+  function removeSkillEvidenceEntry(skillId, evidenceId) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var skill = profile.skills.find(function (item) { return item.id === skillId; });
+    if (!skill) return;
+    skill.evidenceItems = Array.isArray(skill.evidenceItems) ? skill.evidenceItems.filter(function (entry) { return entry.id !== evidenceId; }) : [];
+    skill.verificationStatus = skill.evidenceItems.length ? "Evidence Submitted" : "Self-Reported";
+    if (!skill.evidenceItems.length) {
+      skill.reviewFeedback = "";
+      skill.reviewedAt = "";
+    }
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      setSkillEvidenceMessage("Could not remove this evidence in this browser. Check local storage settings and try again.", true);
+      return;
+    }
+    setStudentStatus("Evidence removed from this skill in the browser-local profile.");
+    clearSkillEvidenceForm();
+    renderStudentSkillEditor();
+  }
+
+  function editSkillEvidenceEntry(skillId, evidenceId) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var skill = profile.skills.find(function (item) { return item.id === skillId; });
+    if (!skill) return;
+    var entry = Array.isArray(skill.evidenceItems) ? skill.evidenceItems.find(function (item) { return item.id === evidenceId; }) : null;
+    if (!entry) return;
+    var skillSelect = document.getElementById("student-skill-evidence-skill");
+    var typeSelect = document.getElementById("student-skill-evidence-type");
+    var urlInput = document.getElementById("student-skill-evidence-url");
+    var descriptionInput = document.getElementById("student-skill-evidence-description");
+    var itemInput = document.getElementById("student-skill-evidence-item");
+    if (skillSelect) skillSelect.value = skillId;
+    if (typeSelect) typeSelect.value = entry.type || "project";
+    if (urlInput) urlInput.value = entry.url || "";
+    if (descriptionInput) descriptionInput.value = entry.description || "";
+    if (itemInput) itemInput.value = entry.id;
+    setSkillEvidenceMessage("Editing evidence for " + skill.name + ". Save or clear to cancel.", false);
+    renderStudentSkillEvidenceList();
   }
 
   function renderStudentProjectEditor() {
@@ -2809,11 +3069,31 @@
     });
   }
 
+  var studentSkillEvidenceSkill = document.getElementById("student-skill-evidence-skill");
+  if (studentSkillEvidenceSkill) {
+    studentSkillEvidenceSkill.addEventListener("change", function () {
+      renderStudentSkillEvidenceList();
+      setSkillEvidenceMessage("");
+    });
+  }
+  var studentSkillEvidenceSave = document.getElementById("student-skill-evidence-save");
+  if (studentSkillEvidenceSave) studentSkillEvidenceSave.addEventListener("click", saveSkillEvidenceToProfile);
+  var studentSkillEvidenceClear = document.getElementById("student-skill-evidence-clear");
+  if (studentSkillEvidenceClear) {
+    studentSkillEvidenceClear.addEventListener("click", function () {
+      var itemField = document.getElementById("student-skill-evidence-item");
+      if (itemField) itemField.value = "";
+      clearSkillEvidenceForm();
+    });
+  }
+
   /* ---------- Recruiter portal (browser-local demo only) ---------- */
   var RECRUITER_LISTINGS_KEY = "nexora:demo-recruiter-listings";
+  var RECRUITER_REMINDERS_KEY = "nexora:demo-recruiter-reminders";
   var COMPANY_PROFILE_KEY = "nexora:demo-company-profile";
   var JOB_REPORTS_KEY = "nexora:demo-job-reports";
   var RECRUITER_REVIEW_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
+  var RECRUITER_REMINDER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
   var recruiterForm = document.getElementById("recruiter-listing-form");
   var recruiterFormStatus = document.getElementById("recruiter-form-status");
   var recruiterListingDraftId = null;
@@ -3104,6 +3384,64 @@
     return isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleString();
   }
 
+  function skillEvidenceReviewEntries(profile) {
+    var normalized = normalizeStudentProfile(profile || readDemoProfile());
+    var entries = [];
+    normalized.skills.forEach(function (skill) {
+      if (!Array.isArray(skill.evidenceItems) || !skill.evidenceItems.length) return;
+      skill.evidenceItems.forEach(function (entry) {
+        entries.push({
+          type: "skill-evidence",
+          id: entry.id,
+          status: skill.verificationStatus || "Evidence Submitted",
+          skillId: skill.id,
+          skillName: skill.name,
+          evidenceLabel: entry.label || "Evidence",
+          url: entry.url || "",
+          description: entry.description || "No description supplied.",
+          submittedAt: entry.submittedAt || skill.submittedAt || new Date().toISOString(),
+          reviewedAt: entry.reviewedAt || skill.reviewedAt || "",
+          reviewFeedback: entry.reviewFeedback || skill.reviewFeedback || "",
+          note: skillVerificationExplanation(skill.verificationStatus || "Evidence Submitted")
+        });
+      });
+    });
+    return entries;
+  }
+
+  function renderSkillEvidenceReviewQueue(entries, selectedStatus) {
+    var filtered = entries.filter(function (entry) {
+      return selectedStatus === "all" || entry.status === selectedStatus;
+    }).slice().sort(function (a, b) {
+      return String(b.submittedAt).localeCompare(String(a.submittedAt));
+    });
+    if (!filtered.length) return "";
+    return filtered.map(function (entry) {
+      var actions = "";
+      if (entry.status === "Evidence Submitted") {
+        actions = '<button class="btn btn--secondary" type="button" data-skill-evidence-review-status="' + escapeHtml(entry.skillId) + '" data-skill-evidence-review-item="' + escapeHtml(entry.id) + '" data-next-skill-evidence-status="Under Review">Mark Under Review</button>' +
+          '<button class="btn btn--text" type="button" data-skill-evidence-review-status="' + escapeHtml(entry.skillId) + '" data-skill-evidence-review-item="' + escapeHtml(entry.id) + '" data-next-skill-evidence-status="Verified">Verify</button>' +
+          '<button class="btn btn--text" type="button" data-skill-evidence-review-status="' + escapeHtml(entry.skillId) + '" data-skill-evidence-review-item="' + escapeHtml(entry.id) + '" data-next-skill-evidence-status="Rejected / More Evidence Needed">Reject / More evidence</button>';
+      } else if (entry.status === "Under Review") {
+        actions = '<button class="btn btn--secondary" type="button" data-skill-evidence-review-status="' + escapeHtml(entry.skillId) + '" data-skill-evidence-review-item="' + escapeHtml(entry.id) + '" data-next-skill-evidence-status="Verified">Verify</button>' +
+          '<button class="btn btn--text" type="button" data-skill-evidence-review-status="' + escapeHtml(entry.skillId) + '" data-skill-evidence-review-item="' + escapeHtml(entry.id) + '" data-next-skill-evidence-status="Rejected / More Evidence Needed">Reject / More evidence</button>';
+      }
+      var proofLink = entry.url ? '<a class="link" href="' + escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">Open submitted evidence</a>' : "";
+      return '<li class="review-queue-item">' +
+        '<div class="review-queue-item__head"><div><h3>' + escapeHtml(entry.skillName) + '</h3><p>Skill evidence review</p></div><span class="review-status review-status--' + escapeHtml((entry.status || "Evidence Submitted").toLowerCase().replace(/\s+/g, "-")) + '">' + escapeHtml(entry.status) + '</span></div>' +
+        '<dl class="review-queue-item__details">' +
+          '<dt>Evidence type</dt><dd>' + escapeHtml(entry.evidenceLabel) + '</dd>' +
+          '<dt>Submitted</dt><dd>' + escapeHtml(formatReportDate(entry.submittedAt)) + '</dd>' +
+          '<dt>Evidence summary</dt><dd>' + escapeHtml(entry.description) + '</dd>' +
+          '<dt>Link</dt><dd>' + (proofLink || "No public link was supplied.") + '</dd>' +
+          '<dt>Reviewer feedback</dt><dd>' + escapeHtml(entry.reviewFeedback || "No feedback recorded yet.") + '</dd>' +
+          '<dt>Status note</dt><dd>' + escapeHtml(entry.note) + '</dd>' +
+        '</dl>' +
+        '<div class="review-queue-item__actions">' + actions + '</div>' +
+      '</li>';
+    }).join("");
+  }
+
   function renderAdminReviewQueue() {
     var list = document.getElementById("admin-review-list");
     var feedback = document.getElementById("admin-review-feedback");
@@ -3120,13 +3458,9 @@
     var reports = stored.reports.filter(function (report) {
       return selectedStatus === "all" || report.status === selectedStatus;
     });
-    if (!reports.length) {
-      var title = stored.reports.length ? "No reports match this status" : "No reports have been submitted";
-      var text = stored.reports.length ? "Choose another review status to see saved reports." : "Reports submitted from job listings will appear here in this browser-local demo.";
-      list.innerHTML = '<li class="review-queue-empty"><h3>' + escapeHtml(title) + '</h3><p>' + escapeHtml(text) + '</p></li>';
-      return;
-    }
-    list.innerHTML = reports.slice().sort(function (a, b) {
+    var evidenceEntries = skillEvidenceReviewEntries(readDemoProfile());
+    var evidence = renderSkillEvidenceReviewQueue(evidenceEntries, selectedStatus);
+    var reportMarkup = reports.slice().sort(function (a, b) {
       return String(b.timestamp).localeCompare(String(a.timestamp));
     }).map(function (report) {
       var subject = report.targetType === "recruiter" ? report.companyName || "Recruiter not named" : report.jobTitle || "Job listing";
@@ -3154,6 +3488,47 @@
         '<div class="review-queue-item__actions">' + actions + '</div>' +
       '</li>';
     }).join("");
+    var queueHtml = reportMarkup + evidence;
+    if (!queueHtml) {
+      var title = stored.reports.length ? "No reports or evidence match this status" : "No reports or evidence have been submitted";
+      var text = stored.reports.length ? "Choose another review status to see saved entries." : "Reports and skill evidence submitted from this browser will appear here in this local demo.";
+      list.innerHTML = '<li class="review-queue-empty"><h3>' + escapeHtml(title) + '</h3><p>' + escapeHtml(text) + '</p></li>';
+      return;
+    }
+    list.innerHTML = queueHtml;
+  }
+
+  function setSkillEvidenceReviewStatus(skillId, evidenceId, nextStatus) {
+    var allowed = ["Under Review", "Verified", "Rejected / More Evidence Needed"];
+    if (allowed.indexOf(nextStatus) === -1) return;
+    var feedbackEl = document.getElementById("admin-review-feedback");
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var skill = profile.skills.find(function (item) { return item.id === skillId; });
+    if (!skill) {
+      if (feedbackEl) feedbackEl.textContent = "That skill is no longer available in this local profile.";
+      return;
+    }
+    var entry = Array.isArray(skill.evidenceItems) ? skill.evidenceItems.find(function (item) { return item.id === evidenceId; }) : null;
+    if (!entry) {
+      if (feedbackEl) feedbackEl.textContent = "That evidence item is no longer available in this local profile.";
+      return;
+    }
+    var note = window.prompt("Add a short reviewer note for " + skill.name + " (optional):", entry.reviewFeedback || "");
+    if (note === null) return;
+    entry.reviewStatus = nextStatus;
+    entry.reviewedAt = new Date().toISOString();
+    entry.reviewFeedback = String(note || "").trim();
+    skill.verificationStatus = nextStatus;
+    skill.reviewedAt = entry.reviewedAt;
+    skill.reviewFeedback = entry.reviewFeedback;
+    profile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(profile)) {
+      if (feedbackEl) feedbackEl.textContent = "The review status could not be saved in this browser. No local review change was made.";
+      return;
+    }
+    renderAdminReviewQueue();
+    renderStudentSkillEditor();
+    if (feedbackEl) feedbackEl.textContent = "Skill evidence status updated to " + nextStatus + " in this browser-local demo.";
   }
 
   function setJobReportStatus(reportId, nextStatus) {
@@ -3319,6 +3694,11 @@
           else applyUrl = parsedUrl.href;
         } catch (error) { applyUrl = ""; }
       }
+      var expiryDate = item.expiryDate && validRecruiterTimestamp(item.expiryDate)
+        ? String(item.expiryDate)
+        : (status === "Published" || status === "Expired") && (item.lastRecruiterActivityAt || item.publishedAt || item.updatedAt || item.createdAt)
+          ? recruiterListingExpiryDate({ lastRecruiterActivityAt: item.lastRecruiterActivityAt || item.publishedAt || item.updatedAt || item.createdAt })
+          : "";
       return {
         id: String(item.id || ""),
         title: String(item.title || "").trim(),
@@ -3341,6 +3721,7 @@
         updatedAt: String(item.updatedAt || item.createdAt || ""),
         publishedAt: String(item.publishedAt || (status === "Published" ? item.updatedAt || item.createdAt || "" : "")),
         lastRecruiterActivityAt: String(item.lastRecruiterActivityAt || (status === "Published" ? item.publishedAt || item.updatedAt || item.createdAt || "" : "")),
+        expiryDate: expiryDate,
         activityEvents: Array.isArray(item.activityEvents) ? item.activityEvents.map(function (event) {
           var entry = event && typeof event === "object" ? event : {};
           var type = ["published", "reconfirmed", "application_reviewed", "applicant_status_changed", "closed", "unpublished", "review_required"].indexOf(entry.type) >= 0 ? entry.type : "";
@@ -3476,6 +3857,49 @@
     return isFinite(time) && time > 0 && time <= Date.now();
   }
 
+  function recruiterListingExpiryDate(listing) {
+    if (!listing) return null;
+    if (listing.expiryDate && validRecruiterTimestamp(listing.expiryDate)) return listing.expiryDate;
+    var reviewDeadline = recruiterReviewDeadline(listing);
+    return reviewDeadline ? new Date(reviewDeadline).toISOString() : null;
+  }
+
+  function readRecruiterReminderState() {
+    try {
+      var raw = window.localStorage.getItem(RECRUITER_REMINDERS_KEY);
+      if (!raw) return {};
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeRecruiterReminderState(state) {
+    try {
+      window.localStorage.setItem(RECRUITER_REMINDERS_KEY, JSON.stringify(state));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function clearRecruiterReminderState(listingId) {
+    if (!listingId) return;
+    var state = readRecruiterReminderState();
+    if (!state[listingId]) return;
+    delete state[listingId];
+    writeRecruiterReminderState(state);
+  }
+
+  function dismissRecruiterReminder(listingId) {
+    if (!listingId) return;
+    var state = readRecruiterReminderState();
+    state[listingId] = { dismissedAt: new Date().toISOString(), type: "expiry" };
+    writeRecruiterReminderState(state);
+    renderRecruiterPortal();
+  }
+
   function addRecruiterActivity(listing, type, timestamp, applicationId) {
     listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
     var event = { type: type, timestamp: timestamp };
@@ -3491,7 +3915,9 @@
     listings.forEach(function (listing) {
       if (listing.status !== "Published") return;
       var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
-      var expired = !validRecruiterTimestamp(activityAt) || checkedAt.getTime() - Date.parse(activityAt) >= RECRUITER_REVIEW_WINDOW_MS;
+      var expiryDate = recruiterListingExpiryDate(listing) || new Date(Date.parse(activityAt || checkedAt.toISOString()) + RECRUITER_REVIEW_WINDOW_MS).toISOString();
+      listing.expiryDate = expiryDate;
+      var expired = !validRecruiterTimestamp(activityAt) || checkedAt.getTime() >= Date.parse(expiryDate);
       if (!expired) return;
       listing.status = "Expired";
       listing.updatedAt = checkedAt.toISOString();
@@ -3594,7 +4020,7 @@
         '<p class="recruiter-listing__meta">' + escapeHtml(listing.location) + ' · ' + escapeHtml(listing.workMode) + ' · ' + escapeHtml(listing.jobType) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Required skills:</strong> ' + escapeHtml(listing.requiredSkills.join(", ")) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Created:</strong> ' + escapeHtml(formatRecruiterDate(listing.createdAt)) + ' · <strong>Updated:</strong> ' + escapeHtml(formatRecruiterDate(listing.updatedAt)) + '</p>' +
-        '<p class="recruiter-review ' + (review.urgent ? 'recruiter-review--urgent' : '') + '"><strong>Last recruiter activity:</strong> ' + escapeHtml(formatRecruiterDate(listing.lastRecruiterActivityAt)) + '<br><strong>15-day review:</strong> ' + escapeHtml(review.text) + '</p>' +
+        '<p class="recruiter-review ' + (review.urgent ? 'recruiter-review--urgent' : '') + '"><strong>Last recruiter activity:</strong> ' + escapeHtml(formatRecruiterDate(listing.lastRecruiterActivityAt)) + '<br><strong>Expiry date:</strong> ' + escapeHtml(formatRecruiterDate(listing.expiryDate || recruiterListingExpiryDate(listing))) + '<br><strong>15-day review:</strong> ' + escapeHtml(review.text) + '</p>' +
         (listing.activityEvents.length ? '<details class="recruiter-activity"><summary>Activity history (' + listing.activityEvents.length + ')</summary><ul>' +
           listing.activityEvents.slice().reverse().map(function (event) {
             return '<li>' + escapeHtml(recruiterActivityLabel(event.type)) + ' · ' + escapeHtml(formatRecruiterDate(event.timestamp)) +
@@ -3609,6 +4035,7 @@
   function renderRecruiterPortal() {
     var listings = getCurrentRecruiterListings();
     renderRecruiterApplicants(listings);
+    renderRecruiterReminders(listings);
     var dashboardList = document.getElementById("recruiter-dashboard-list");
     var listingsList = document.getElementById("recruiter-listings");
     var totalCount = document.getElementById("recruiter-total-count");
@@ -3655,6 +4082,52 @@
       listingsList.innerHTML = '<li class="empty--compact"><h3>' + (ordered.length ? "No listings match these filters" : "No job listings yet") + '</h3><p>' +
         (ordered.length ? "Try another title or status filter." : "Create a job draft to manage a listing in this browser.") + '</p></li>';
     }
+  }
+
+  function renderRecruiterReminders(listings) {
+    var list = document.getElementById("recruiter-reminder-list");
+    var total = document.getElementById("recruiter-reminder-total");
+    if (!list) return;
+    var reminderState = readRecruiterReminderState();
+    var now = Date.now();
+    var active = [];
+    if (Array.isArray(listings)) {
+      listings.forEach(function (listing) {
+        if (listing.status !== "Published" && listing.status !== "Expired") return;
+        if (reminderState[listing.id] && reminderState[listing.id].dismissedAt) return;
+        var expiryDate = recruiterListingExpiryDate(listing);
+        if (!expiryDate) return;
+        if (listing.status === "Expired") {
+          active.push({ id: listing.id, title: listing.title, type: "expired", expiryDate: expiryDate, daysRemaining: 0, remainingDays: 0, action: "Reconfirm Vacancy" });
+          return;
+        }
+        var remainingMs = Date.parse(expiryDate) - now;
+        var remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+        if (remainingDays <= 3 && remainingDays >= 0) {
+          active.push({ id: listing.id, title: listing.title, type: "warning", expiryDate: expiryDate, daysRemaining: remainingDays, remainingDays: remainingDays, action: "Reconfirm Vacancy" });
+        }
+      });
+    }
+    if (total) total.textContent = active.length + (active.length === 1 ? " active" : " active");
+    if (!active.length) {
+      list.innerHTML = '<li class="empty--compact"><h3>No active expiry reminders</h3><p>Published listings are not in their final 3 days yet, and no expired vacancies need review.</p></li>';
+      return;
+    }
+    list.innerHTML = active.map(function (reminder) {
+      var title = reminder.type === "expired" ? "Expired vacancy needs review" : "Final 3 days before expiry";
+      var detail = reminder.type === "expired"
+        ? "This listing passed its local expiry date and has been removed from the active job explorer."
+        : "This published vacancy is in its final 3 days before expiry. Reconfirm it to keep it active.";
+      var daysText = reminder.type === "expired" ? "Expired" : "" + reminder.remainingDays + (reminder.remainingDays === 1 ? " day remaining" : " days remaining");
+      return '<li class="student-item recruiter-reminder" id="recruiter-expiry-reminder-' + escapeHtml(reminder.id) + '">' +
+        '<div><strong>' + escapeHtml(reminder.title) + '</strong>' +
+        '<span class="student-item__meta">' + escapeHtml(title) + ' · ' + escapeHtml(daysText) + '</span>' +
+        '<span class="student-item__meta">Expiry: ' + escapeHtml(formatRecruiterDate(reminder.expiryDate)) + '</span>' +
+        '<span class="student-item__meta">Recommended action: ' + escapeHtml(reminder.action) + '</span></div>' +
+        '<div class="recruiter-listing__actions"><button class="btn btn--primary" type="button" data-recruiter-reconfirm="' + escapeHtml(reminder.id) + '">Reconfirm Vacancy</button>' +
+        '<button class="btn btn--text" type="button" data-recruiter-dismiss-reminder="' + escapeHtml(reminder.id) + '">Dismiss</button></div>' +
+        '<p class="recruiter-listing__note">' + escapeHtml(detail) + '</p></li>';
+    }).join("");
   }
 
   function readRecruiterApplicantProfile() {
@@ -4079,13 +4552,20 @@
       updatedAt: now,
       publishedAt: existing ? existing.publishedAt : "",
       lastRecruiterActivityAt: existing ? existing.lastRecruiterActivityAt : "",
+      expiryDate: existing ? existing.expiryDate : "",
       activityEvents: existing ? existing.activityEvents.slice() : []
     };
     if (status === "Published" && (!existing || existing.status !== "Published")) {
       record.publishedAt = now;
+      record.lastRecruiterActivityAt = now;
+      record.expiryDate = recruiterListingExpiryDate({ lastRecruiterActivityAt: now, publishedAt: now, expiryDate: "" });
       addRecruiterActivity(record, "published", now);
     } else if (existing && status === "Draft" && existing.status === "Published") {
       addRecruiterActivity(record, "unpublished", now);
+      clearRecruiterReminderState(record.id);
+    }
+    if (status === "Published" && record.lastRecruiterActivityAt) {
+      record.expiryDate = recruiterListingExpiryDate(record) || new Date(Date.parse(record.lastRecruiterActivityAt) + RECRUITER_REVIEW_WINDOW_MS).toISOString();
     }
     return record;
   }
@@ -4125,6 +4605,7 @@
     if (draftButton) draftButton.disabled = false;
     if (!stored) return;
     recruiterListingDraftId = record.id;
+    clearRecruiterReminderState(record.id);
     setRecruiterStatus(status === "Draft" ? "Draft saved in this browser only." :
       status === "Published" ? "Published to this browser’s job explorer only. This listing is not verified or shared with other visitors." :
         "Listing saved in this browser only.");
@@ -4225,6 +4706,7 @@
       item.status = nextStatus;
       var at = new Date().toISOString();
       item.updatedAt = at;
+      clearRecruiterReminderState(item.id);
       addRecruiterActivity(item, nextStatus === "Closed" ? "closed" : "unpublished", at);
       return item;
     });
@@ -4246,7 +4728,10 @@
     var at = new Date().toISOString();
     listing.status = "Published";
     listing.publishedAt = listing.publishedAt || at;
+    listing.lastRecruiterActivityAt = at;
+    listing.expiryDate = new Date(Date.parse(at) + RECRUITER_REVIEW_WINDOW_MS).toISOString();
     listing.updatedAt = at;
+    clearRecruiterReminderState(listing.id);
     addRecruiterActivity(listing, "reconfirmed", at);
     if (!writeRecruiterListings(listings)) return;
     setRecruiterStatus("Vacancy reconfirmed in this browser. It is not verified or shared.");
@@ -4327,6 +4812,11 @@
   });
 
   document.addEventListener("click", function (event) {
+    var skillEvidenceReviewButton = event.target.closest("[data-skill-evidence-review-status]");
+    if (skillEvidenceReviewButton) {
+      setSkillEvidenceReviewStatus(skillEvidenceReviewButton.dataset.skillEvidenceReviewStatus, skillEvidenceReviewButton.dataset.skillEvidenceReviewItem, skillEvidenceReviewButton.dataset.nextSkillEvidenceStatus);
+      return;
+    }
     var reportStatusButton = event.target.closest("[data-report-status]");
     if (reportStatusButton) {
       setJobReportStatus(reportStatusButton.dataset.reportStatus, reportStatusButton.dataset.nextReportStatus);
@@ -4372,6 +4862,11 @@
     var recruiterReconfirmButton = event.target.closest("[data-recruiter-reconfirm]");
     if (recruiterReconfirmButton) {
       reconfirmRecruiterListing(recruiterReconfirmButton.dataset.recruiterReconfirm);
+      return;
+    }
+    var recruiterDismissReminderButton = event.target.closest("[data-recruiter-dismiss-reminder]");
+    if (recruiterDismissReminderButton) {
+      dismissRecruiterReminder(recruiterDismissReminderButton.dataset.recruiterDismissReminder);
       return;
     }
     var recruiterApplicationSave = event.target.closest("[data-recruiter-app-save]");
@@ -4471,6 +4966,26 @@
     var skillDelete = event.target.closest("[data-student-skill-delete]");
     if (skillDelete) {
       deleteSkillFromProfile(skillDelete.dataset.studentSkillDelete);
+      return;
+    }
+
+    var skillEvidenceEdit = event.target.closest("[data-student-skill-evidence-edit]");
+    if (skillEvidenceEdit) {
+      var skillId = skillEvidenceEdit.dataset.studentSkillEvidenceEdit;
+      var evidenceId = skillEvidenceEdit.dataset.studentSkillEvidenceItem || "";
+      if (evidenceId) {
+        editSkillEvidenceEntry(skillId, evidenceId);
+      } else {
+        var skillSelect = document.getElementById("student-skill-evidence-skill");
+        if (skillSelect) skillSelect.value = skillId;
+        renderStudentSkillEvidenceList();
+      }
+      return;
+    }
+
+    var skillEvidenceDelete = event.target.closest("[data-student-skill-evidence-delete]");
+    if (skillEvidenceDelete) {
+      removeSkillEvidenceEntry(skillEvidenceDelete.dataset.studentSkillEvidenceDelete, skillEvidenceDelete.dataset.studentSkillEvidenceItem);
       return;
     }
 
