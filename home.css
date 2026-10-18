@@ -171,10 +171,12 @@
   .footer__brand { grid-column: 1 / -1; }
   .section__head .link { margin-left: auto; }
   .student-shell__wrap { grid-template-columns: 1fr; }
-  .student-grid, .student-form-grid { grid-template-columns: 1fr; }
-  .recruiter-metrics { grid-template-columns: 1fr; }
+  .student-grid, .student-form-grid, .student-application-filters { grid-template-columns: 1fr; }
+  .recruiter-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recruiter-listing { flex-direction: column; }
   .recruiter-listing__actions { width: 100%; }
+  .recruiter-listing__actions .btn { flex: 1 1 auto; }
+  .recruiter-filters { grid-template-columns: 1fr; }
 }
 
 /* Filters bar (Step 1.2) */
@@ -186,6 +188,7 @@
 .results__count { font-size: var(--text-base); font-weight: 700; margin-right: var(--space-2); }
 .filters__active { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 @media (max-width: 60rem) { .filters__grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 40.0625rem) and (max-width: 60rem) { .recruiter-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 40rem) {
   .filters__grid { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
   .filter { padding-inline: var(--space-3); }
@@ -196,4 +199,5 @@
   .auth-form__actions--spread .auth-form__actions--inline { width: 100%; justify-content: space-between; }
   .skill-adder { flex-direction: column; align-items: stretch; }
   .summary-card dl { grid-template-columns: 1fr; gap: var(--space-1); }
+  .recruiter-metrics { grid-template-columns: 1fr; }
 }

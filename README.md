@@ -13,13 +13,15 @@ NEXORA is a career-tech platform for students, freshers, and job seekers. This p
 
 ## Phase 2.2 highlights
 
-- Student dashboard with a welcome message and profile completion meter based on locally stored demo profile data.
+- Get Started opens student onboarding directly; the summary is only a preview and profile data is saved only when setup is finished.
+- Student dashboard with a welcome message and an accessible completion meter based on five saved core fields: name, headline, education, career interests, and at least one skill. Projects and links remain optional.
 - Student profile page with editable fields: name, headline, education, college, graduation year, career interests, desired roles, work modes, preferred locations, skills, GitHub and portfolio links.
-- Save-and-sync flow uses the existing `nexora:demo-profile` browser-local structure and reuses the same bookmark list as the job explorer.
-- Dashboard cards for Saved Jobs, My Applications and Profile Overview use truthful empty states where features are not backed by a real backend.
-- Skills and projects from Step 2.3 remain locally saved, user-managed profile data with no verification claims.
+- Save, cancel, onboarding, dashboard and profile views use the existing `nexora:demo-profile` browser-local structure; legacy string skills and saved skill objects are both supported.
+- Saved Jobs reuses the job explorer's bookmark list. My Applications now provides a browser-local tracker inside the existing demo profile. Students can add a listed or manual job record, maintain its status and notes, filter/search, edit, and remove it. Records are not employer-confirmed or synced.
+- Students can add skills with a button or Enter, edit and remove them, and select an optional proficiency (Beginner, Intermediate, Advanced). Empty and case-insensitive duplicate names are rejected.
+- Skills and projects remain in the existing `nexora:demo-profile` data; the dashboard overview and completion meter update from saved skills. Skill evidence is labeled Self-declared unless the student explicitly links a project.
 
-This is a demo-only frontend experience. No real backend auth, password storage, recruiter verification, job publishing, or application tracking is claimed.
+This is a demo-only frontend experience. No real backend authentication, password storage, recruiter verification, public job publishing, application submission, or employer-synced status tracking is claimed.
 
 ## Tech stack
 
@@ -31,9 +33,14 @@ Actual validation performed:
 - Static JavaScript validation: `node --check assets/js/main.js` passed.
 - Python standard-library HTML parsing found no duplicate element IDs in `index.html`.
 - Integrated browser automation against a local HTTP server exercised recruiter required-field validation, unsafe URL rejection, draft creation, safe rendering, reload persistence, edit/status counts, published-state disclosure, and confirmed deletion.
-- Integrated browser regression checks confirmed student dashboard/profile navigation and that the six existing job cards and keyword search still work.
+- Integrated browser regression checks confirmed student dashboard/profile navigation, all six existing job cards, keyword search, the Internship filter, job details, and the honest demo Apply Now flow.
+- Integrated browser checks against the local `file://` page exercised Get Started → onboarding → save → dashboard, optional onboarding preferences, preview without premature persistence, completion calculation, profile display/edit/save/cancel, refresh persistence, bookmark behavior, malformed profile storage, and the truthful applications empty state after an external redirect record.
+- Current application-tracker browser checks exercised onboarding to dashboard, profile completion guidance, existing-listing application entry, notes/status editing, duplicate prevention and edit-existing resolution, dashboard/My Applications consistency, reload persistence, status filtering, deletion confirmation, safe handling of malformed tracker data, and the external redirect-to-manual-record flow.
+- Current regression browser checks exercised profile editing with application preservation, bookmark add/remove, recruiter portal navigation without changing recruiter listing data, and a 390px application layout without horizontal overflow.
+- Integrated browser skill-management checks exercised add by button/Enter, empty and case-insensitive duplicate rejection, selected and unselected proficiency, edit/remove, refresh persistence, dashboard consistency, completion changes, and a 390px no-overflow layout.
+- Integrated browser project checks exercised empty and required-field states, unsafe URL rejection, add/edit, student-added preview labels, safe new-tab link attributes, delete confirm/cancel, persistence and dashboard consistency, malformed/unsafe stored data handling, and mobile overflow.
 
-The existing optional Python Playwright regression suite was not run in this environment because the Python Playwright package is unavailable. Earlier Step 1.3 test results documented below are historical results, not a fresh full-suite run for this change.
+The optional Python Playwright regression suite was attempted but could not start because the Python `playwright` package is unavailable. The browser checks above were performed in the integrated browser and are not a Playwright test-suite run. Earlier Step 1.3 results documented below are historical, not a fresh full-suite run for this change.
 
 ## How to run
 
@@ -53,10 +60,30 @@ An internet connection is only needed for the Google Font (Plus Jakarta Sans). O
 
 ## How to try the new features by hand (3 minutes)
 
-### Demo authentication and onboarding (Step 2.1)
+### Demo access and student onboarding (Steps 2.1–2.2)
 
-- Open the page and use **Sign In** or **Get Started** in the header or mobile menu. This is a browser-only demo flow: it validates form fields, shows password visibility toggles, and stores non-sensitive profile data in the visitor's local browser storage. It does not create a secure real account or send reset emails.
-- On **Get Started** you create a demo profile, then a four-step student onboarding experience appears. Required fields are validated before you can continue, and optional links are only accepted if they use `http` or `https`.
+- Use **Get Started** in the header or mobile menu to open the four-step student onboarding directly. Enter your name, education, and at least one skill; preferences, career interests, projects, and links can remain incomplete. Optional links accept only `http` or `https`.
+- Review the summary, then choose **Finish setup** to save the profile to this browser and open the dashboard. The summary does not save changes before Finish. Edit Profile supports Save and Cancel; Cancel discards unsaved form edits.
+- This is browser-local demo access, not real authentication. No password is saved and no backend account is created. **Sign In** remains a demo-only interface and does not send reset emails.
+
+### My Applications (local demo tracker)
+
+- Open **My Applications** from the student portal and choose **Add application**. Select an available listing to copy its title and company, or choose manual entry. Shipped sample opportunities are fictional; their presence in the tracker does not make them real vacancies.
+- Enter the application date, method/source, a status, and optional notes. Status options are Applied, Viewed, In Review, Shortlisted, Rejected, and Closed. You maintain these values; no employer response is received or implied.
+- If you followed an external application link, NEXORA does not record an application automatically. After submitting on the employer’s site, use **I've applied · record it** in the review view or add a record manually. Save is still required.
+- Records are stored in `nexora:demo-profile` with the rest of this browser’s student profile. Duplicate jobs are blocked; use **Edit existing application** to update the existing record. Removing a record asks for confirmation.
+
+### Student skills (Step 2.3, Part 1)
+
+- Open **Profile** from the student dashboard or site navigation. Add a skill with **Add skill** or press Enter; optionally choose a proficiency level yourself.
+- Edit or remove a saved skill with its controls. Names must be non-empty and unique regardless of capitalization.
+- Skills are stored with the browser-local profile and shown in the dashboard overview. “Project-linked” appears only when a project is explicitly selected; no verification or endorsement is implied.
+
+### Student projects and proof of work (Step 2.3, Part 2)
+
+- In **Profile**, add a project with a title, description, technologies, and your role/contribution. These fields are required; GitHub repository and live-demo URLs are optional and must be valid HTTP(S) URLs.
+- Edit an existing project or use Delete; deleting requires confirmation. Project records are stored in the same browser-local profile as skills and remain optional for profile completion.
+- The dashboard profile overview shows project details and available links. Links open in a new tab with `noopener noreferrer`. “Project added by student” and “Repository link provided” are descriptive labels only; NEXORA does not verify projects, repository contents, contributions, or skills.
 - A **Reset demo profile data** button clears the locally saved onboarding data. The job explorer remains available as the guest experience, and users can return to browsing at any time without losing the search/filter state in the list.
 
 ### Recruiter portal (Step 3.1)
@@ -98,8 +125,8 @@ assets/
   js/
     data.js                Central job data: DEMO listings (all fictional) + schema docs. Data only.
     jobs.js                Pure logic, no DOM: normalise, search, filter, sort, card facts, formatting, apply-destination rules. window.NexoraJobs
-    applications.js        Application-record structure + in-memory store seam. No persistence, no backend. window.NexoraApplications
-    main.js                UI wiring: menu, rendering, search/filter controls, bookmarks, details dialog and apply flow
+    applications.js        External redirect event structure + in-memory store seam. No backend. window.NexoraApplications
+    main.js                UI wiring: student profile and local application tracker, search/filter, bookmarks, details dialog and apply flow
 tests/
   regression_test.py       Optional Playwright test suite (see above)
   results.json             Output of the last test run
@@ -126,13 +153,12 @@ README.md  PROJECT_CONTEXT.md  PROGRESS.md  TEST_REPORT.md
 - **Save job** inside the dialog uses the same bookmark list as the cards.
 - **Accessibility**: native modal dialog (focus kept inside, background inert), labelled by the job title, X / Close / Escape / backdrop to close, page scroll locked while open and released after, focus restored to the opening card (or the Saved button if that card is gone), status messages announced in a live region.
 
-## Application records: what exists and what does not
+## Application records: separate local tracker and redirect events
 
-`assets/js/applications.js` defines the record shape (`applicationId, jobId, candidateId, createdAt, method, status, destinationHost`) and an in-memory store with a `save/list` interface a future backend can replace.
+The **My Applications** UI stores records inside the existing `nexora:demo-profile` browser-local profile. It captures the job title, company, application date, student-entered method/source, one of six student-maintained statuses, and optional notes. Student-entered status is labeled as such and is not employer-confirmed. Records survive reload in this browser and are not synced to other devices or users.
 
-- Opening an external site is recorded only as `method: "external_redirect"`, `status: "EXTERNAL_REDIRECT_OPENED"`, meaning the visitor was sent to the employer. NEXORA cannot know whether they applied. It is **never** "Submitted".
-- `SUBMITTED` is reserved for applications really submitted through NEXORA. `createRecord` refuses that method until a backend exists.
-- Records live in memory for the page visit only. Nothing is written to `localStorage`, nothing is sent anywhere, and nothing about them is shown in the UI yet.
+- Separately, `assets/js/applications.js` defines an in-memory external-redirect event shape (`applicationId, jobId, candidateId, createdAt, method, status, destinationHost`) with `method: "external_redirect"` and `status: "EXTERNAL_REDIRECT_OPENED"`. An external redirect does not create a My Applications entry or assert that the visitor applied.
+- NEXORA does not submit applications. A student must explicitly save their own record after submission; that is a local self-report, not proof of submission.
 - No resumes, phone numbers, emails or other personal data are collected.
 
 ## Bookmarks: what they are and are not
@@ -153,11 +179,11 @@ Bookmarks are stored with `localStorage` in the visitor's own browser, under the
 ## Known limitations
 
 - **All opportunities are demo data** from fictional companies. Nothing can be applied to, and no shipped listing has a salary, dates, description or application URL. The real-URL flow was tested with temporary test data (and a mocked external site), not with shipped data.
-- **NEXORA cannot submit applications, track outcomes or show recruiter responses.** There is no backend, login, resume upload or application history.
+- **NEXORA cannot submit applications or sync employer outcomes/responses.** The local tracker stores only student-entered notes and statuses in this browser. There is no backend, real login, or recruiter-to-student status connection.
 - "View details" is a dialog, not a separate page, and has no shareable URL.
 - Search matches word starts only ("script" will not find "JavaScript"). Remote listings do not match a city search; searching "remote" matches them.
 - Filter state (including Saved only) is not stored in the URL and resets on reload.
-- **Not built yet** (marked "Soon" or shown with a dialog): Sign In, Get Started, Companies, Resources, View All, About, Contact, Privacy, Terms.
+- **Not built yet** (marked "Soon" or shown with a dialog): real authentication, Companies, Resources, View All, About, Contact, Privacy, Terms.
 - On a phone the **Apply Now** button sits below the description, so a long listing needs a scroll inside the dialog.
 - Tested in headless Chromium only (see `TEST_REPORT.md` for what was and was not tested).
 

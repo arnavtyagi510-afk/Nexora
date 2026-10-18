@@ -27,25 +27,89 @@
 
 ## Phase 2, Step 2.2 — Student Profile & Dashboard Foundation — STATUS: COMPLETE (frontend demo scope)
 
+### Bug-fix repair
+- Get Started now opens student onboarding directly; only Finish writes profile data, and successful setup routes to the dashboard.
+- Onboarding and dashboard support legacy string skills as well as skill objects. Preview displays skill names without object coercion.
+- Profile completion reflects five actual saved core fields: name, headline, education, career interests and at least one skill. Optional projects and links are excluded.
+- Profile editing permits partial saved data, with Cancel restoring saved values and failed local writes reported honestly.
+- The browser-local My Applications tracker stores explicitly student-entered application records in the existing profile. External redirects remain excluded unless the student manually confirms an application and saves a record.
+- Malformed profile data is handled without disturbing independent bookmarks or recruiter listings.
+
+### Files changed in this repair
+`index.html`, `assets/js/main.js`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- `node --check assets/js/main.js` — PASS.
+- Standard-library HTML parse and duplicate-ID check — PASS.
+- Integrated-browser flows — PASS: Get Started → onboarding → summary preview → Finish → dashboard; optional preferences; completion at 100% and 80% from actual fields; optional projects excluded; legacy string skills; profile consistency, Save and Cancel; refresh persistence; bookmark interaction; malformed storage; external redirects excluded from My Applications; and job search, filtering, details, and demo Apply Now regression.
+- The optional Python Playwright regression script was attempted but could not start because `playwright` is not installed.
+
+### Known limitations
+- No backend, no real accounts, no application submission, and no employer-synced status tracking are in place.
+- My Applications is not a source of verified outcomes; it stores the student's own status notes only.
+- Dashboard data is browser-local only and resets with local demo data resets.
+
+## Demo Profile & Application Tracker — STATUS: IMPLEMENTED (browser-local demo)
+
 ### Features implemented
-- Student portal shell with dashboard/profile navigation and responsive layout.
-- Welcome banner and profile completion meter calculated from the existing local demo profile data.
-- Editable student profile form with save-to-localStorage behavior using the existing `nexora:demo-profile` structure.
-- Saved Jobs section synchronized with the existing bookmark system (`nexora:demo-saved`).
-- Honest empty states for My Applications and any profile content not yet available.
-- Dashboard and profile views remain in the same plain HTML/CSS/JS architecture without changing the established forest-green and ivory theme.
+- Added a My Applications route and dashboard preview backed by an `applications` array within the existing `nexora:demo-profile` record. No new profile store or storage key was added.
+- Students can select an available listing or enter a job manually, then record title, company, date, method/source, status, and optional notes.
+- Status choices are Applied, Viewed, In Review, Shortlisted, Rejected, and Closed. Every value is student-maintained; no status is automatically inferred or synced from an employer.
+- Add/edit, status and notes updates, title/company search, status filtering, duplicate detection with an Edit existing action, and confirmed removal are implemented.
+- The external job review step offers “I've applied · record it”; it only opens a prefilled, unsaved form. Opening an employer site never creates an Applied record.
+- Dashboard and tracker render the same profile records. Application-only profiles can still reopen the student dashboard; incomplete profiles get an honest completion prompt.
+- Malformed application arrays are safely treated as empty without changing saved skills/projects or independent bookmarks/recruiter listing storage.
 
 ### Files changed
 `index.html`, `assets/js/main.js`, `assets/css/components.css`, `assets/css/home.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
 
 ### Validation status
-- Static validation performed: `node --check assets/js/main.js` passed.
-- Browser automation was not executed for this Step 2.2 work in this environment, so browser-level UI assertions remain a known limitation.
+- Integrated-browser checks passed for onboarding to dashboard, profile completion prompt, create from a listed job and by manual entry, duplicate resolution, edit status/notes, dashboard consistency, reload persistence, status filters, confirmed deletion, malformed data handling, and no-overflow layout at 390px.
+- External Apply Now review was exercised with a temporary browser-local recruiter fixture. Continuing was intercepted to prevent leaving the test page; it did not create an application record. The explicit “I've applied” action opened a prefilled but unsaved form, and only the later Save created a student-entered record.
+- Empty required fields and a future date were rejected; invalid controls were announced and focus moved to the first invalid field.
+- Regression smoke checks passed for profile edit preserving applications, bookmark add/remove, recruiter navigation, and temporary recruiter draft creation/persistence/counting. Test fixtures were restored.
+- `node --check assets/js/main.js` and Python standard-library HTML parse/duplicate-ID checks passed. `python tests\regression_test.py` could not start because Python Playwright is not installed.
 
-### Known limitations
-- No backend, no real accounts, and no real application tracking are in place.
-- My Applications intentionally stays empty and does not fabricate status data.
-- Dashboard data is browser-local only and resets with local demo data resets.
+### Limitations
+- All application data is local to one browser profile, not associated with verified identity, and does not sync to a server or employer.
+- A saved status is a student self-report; NEXORA does not confirm submission, employer views, review, rejection, or other outcomes.
+- Shipped sample opportunities are fictional demo listings. Selecting one for tracker testing does not make it a real vacancy or an application destination.
+
+## Phase 2, Step 2.3 Part 1 — Student Skills Management — STATUS: COMPLETE (frontend demo scope)
+
+### Features implemented
+- Profile skill input is labeled and supports both the Add skill button and Enter.
+- Empty names and case-insensitive duplicate names are rejected with inline feedback; editing a skill does not create a duplicate record.
+- Students can edit and remove skills. Optional Beginner, Intermediate, or Advanced proficiency is saved only if selected by the student.
+- Existing non-listed saved proficiency values remain available as their current saved value when editing; they are not assigned automatically.
+- Skills display as wrapping responsive tags. Skill list controls have minimum usable hit targets. Evidence labels remain honest: Self-declared unless a project was explicitly linked.
+- Skills persist in the existing `nexora:demo-profile` storage and refresh dashboard overview/completion from the saved profile.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Browser-verified add by button and Enter, no auto-assigned level, empty validation, case-insensitive duplicate rejection, edit without duplication, remove, completion changing from 100% to 80% when the last skill is removed, chosen proficiency persistence, refresh persistence, dashboard consistency, and 390px layout.
+- A click hit-target issue discovered during verification was fixed and the Edit button re-tested successfully.
+- `node --check` and HTML parse/duplicate-ID checks passed. The optional Python Playwright suite was attempted but could not start without its Python dependency; see `TEST_REPORT.md`.
+
+## Phase 2, Step 2.3 Part 2 — Student Projects & Proof-of-Work Portfolio — STATUS: COMPLETE (frontend demo scope)
+
+### Features implemented
+- Added project title, description, technologies, role/contribution, optional GitHub repository URL and optional live-demo URL to the existing Profile editor.
+- Required fields and optional URLs are validated; URLs must be HTTP(S), have a hostname, and contain no embedded credentials.
+- Projects can be added, edited, and deleted with an explicit confirmation. Profile editor and dashboard overview render the same saved project records.
+- Project text is safely escaped. Valid links open in a new tab with `noopener noreferrer`; unsafe legacy stored links are omitted.
+- Empty state and truthful “Project added by student” / “Repository link provided” labels make no verification claims.
+- Projects use `nexora:demo-profile` and do not count toward profile completion. Skills and explicit project links remain intact; deleting a linked project removes the explicit link.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated-browser create, required validation, invalid URL rejection, edit, delete confirm/cancel, persistence, dashboard preview, safe links, malformed project data, and existing skills all checked.
+- Job Explorer search/filter, bookmark add/remove, onboarding access and guest return, and recruiter portal navigation smoke checks passed.
+- `node --check` and HTML parse/duplicate-ID checks passed. The optional Python Playwright suite could not start because the package is unavailable; see `TEST_REPORT.md`.
 
 ## Phase 1, Step 1.3 — Job details and application flow — STATUS: COMPLETE (frontend scope)
 
@@ -66,7 +130,7 @@
 
 ### Known issues and limitations
 - All listings are DEMO. Real-URL, verified, pay, date and description rendering was exercised only with temporary test data (and a mocked external site), not with shipped data.
-- No backend: no application submission, tracking, history, recruiter responses, accounts, resume upload or synced bookmarks. Application records exist only in memory for the page visit and are not displayed.
+- No backend: no application submission, employer-synced history/status, recruiter responses, accounts, resume upload or synced bookmarks. Step 1.3 external redirect events remain in memory; the later student-entered local tracker is documented above.
 - "View details" is a dialog with no shareable URL.
 - Search word-start only; remote jobs do not match a city search; filter state resets on reload; bookmarks are browser-local.
 - Chromium prefers one extra native Tab stop (its own UI) after the last control in a modal; focus never reaches page controls.

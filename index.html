@@ -59,7 +59,7 @@
 
       <div class="nav__actions">
         <button class="btn btn--text" type="button" data-auth-target="signin">Sign In</button>
-        <button class="btn btn--primary" type="button" data-auth-target="signup">Get Started</button>
+        <button class="btn btn--primary" type="button" data-auth-target="onboarding">Get Started</button>
         <button class="nav__toggle" type="button" id="menu-toggle" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
           <svg class="icon icon-open" aria-hidden="true"><use href="#i-menu"/></svg>
           <svg class="icon icon-close" aria-hidden="true"><use href="#i-close"/></svg>
@@ -78,7 +78,7 @@
         <button class="mobile-menu__link" type="button" data-soon="Resources">Resources<span class="soon-tag">Soon</span></button>
         <div class="mobile-menu__actions">
           <button class="btn btn--secondary btn--block" type="button" data-auth-target="signin">Sign In</button>
-          <button class="btn btn--primary btn--block" type="button" data-auth-target="signup">Get Started</button>
+          <button class="btn btn--primary btn--block" type="button" data-auth-target="onboarding">Get Started</button>
         </div>
       </div>
     </div>
@@ -95,9 +95,9 @@
           <button class="btn btn--text" type="button" id="auth-close" aria-label="Return to browsing">Return to browsing</button>
         </div>
 
-        <div class="segmented auth-tabs" role="tablist" aria-label="Authentication options">
+        <div class="segmented auth-tabs" role="tablist" aria-label="Demo access options">
           <button type="button" class="is-active" role="tab" aria-selected="true" aria-controls="auth-signin-panel" id="tab-signin" data-auth-tab="signin">Sign In</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="auth-signup-panel" id="tab-signup" data-auth-tab="signup">Get Started</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="auth-onboarding-panel" id="tab-signup" data-auth-tab="onboarding">Get Started</button>
         </div>
 
         <div class="auth-views">
@@ -299,6 +299,7 @@
         </div>
         <button type="button" class="student-shell__nav is-active" data-student-route="dashboard">Dashboard</button>
         <button type="button" class="student-shell__nav" data-student-route="profile">Profile</button>
+        <button type="button" class="student-shell__nav" data-student-route="applications">My Applications</button>
         <button type="button" class="student-shell__nav" data-student-route="explore">Explore jobs</button>
       </aside>
 
@@ -310,10 +311,16 @@
               <h2 id="student-welcome-name">Student</h2>
             </div>
             <div class="student-completion" aria-live="polite">
-              <span class="student-completion__label">Profile completion</span>
-              <div class="student-completion__track" aria-hidden="true"><span id="student-completion-bar"></span></div>
+              <span class="student-completion__label" id="student-completion-label">Profile completion</span>
+              <div class="student-completion__track" id="student-completion-bar" role="progressbar" aria-labelledby="student-completion-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
               <strong id="student-completion-value">0%</strong>
+              <span class="student-completion__detail" id="student-completion-detail">0 of 5 core fields complete</span>
             </div>
+          </div>
+          <p class="auth-status" id="student-dashboard-status" role="status" aria-live="polite"></p>
+          <div class="recruiter-notice" id="student-profile-nudge" hidden>
+            <span>Your profile is incomplete. Add the details you choose to help present your experience.</span>
+            <button class="btn btn--secondary" type="button" data-student-route="profile">Complete profile</button>
           </div>
 
           <div class="student-grid">
@@ -328,6 +335,7 @@
             <section class="student-card">
               <div class="student-card__head">
                 <h3>My Applications</h3>
+                <button class="link" type="button" data-student-route="applications">View all</button>
               </div>
               <ul class="student-list" id="student-applications"></ul>
             </section>
@@ -340,6 +348,93 @@
             </div>
             <div id="student-profile-overview" class="student-overview"></div>
           </section>
+        </section>
+
+        <section class="student-view" id="student-applications-view" hidden aria-labelledby="student-applications-title">
+          <div class="student-card student-card--wide">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Local demo tracker</p>
+                <h2 id="student-applications-title">My Applications</h2>
+              </div>
+              <button class="btn btn--primary" type="button" id="student-application-add">Add application</button>
+            </div>
+            <p class="recruiter-notice">These records are entered and maintained by you in this browser. Employer responses and status changes are not synced. Only record an application after you have submitted it; opening an employer website does not submit one. Shipped sample listings are fictional demo data.</p>
+            <form id="student-application-form" class="student-application-form" hidden novalidate>
+              <div class="student-form-grid">
+                <div class="field-group field-group--full">
+                  <label for="student-application-job">Job listing</label>
+                  <select class="select" id="student-application-job">
+                    <option value="">Manual entry (not linked to a listing)</option>
+                  </select>
+                  <p class="student-item__meta" id="student-application-job-help">Choose a listing to copy its title and company, or enter a job manually. Listing details may be demo data.</p>
+                </div>
+                <div class="field-group">
+                  <label for="student-application-title">Job title</label>
+                  <input class="input" id="student-application-title" type="text" maxlength="160" aria-describedby="student-application-title-error" required>
+                  <p class="field-error" id="student-application-title-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="student-application-company">Company</label>
+                  <input class="input" id="student-application-company" type="text" maxlength="160" aria-describedby="student-application-company-error" required>
+                  <p class="field-error" id="student-application-company-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="student-application-date">Application date</label>
+                  <input class="input" id="student-application-date" type="date" aria-describedby="student-application-date-error" required>
+                  <p class="field-error" id="student-application-date-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="student-application-source">Application method / source</label>
+                  <input class="input" id="student-application-source" type="text" maxlength="120" aria-describedby="student-application-source-error" required placeholder="For example, employer website or referral">
+                  <p class="field-error" id="student-application-source-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="student-application-status">Status (you maintain this)</label>
+                  <select class="select" id="student-application-status" aria-describedby="student-application-status-error" required>
+                    <option value="">Select a status</option>
+                    <option value="Applied">Applied</option>
+                    <option value="Viewed">Viewed</option>
+                    <option value="In Review">In Review</option>
+                    <option value="Shortlisted">Shortlisted</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                  <p class="field-error" id="student-application-status-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group field-group--full">
+                  <label for="student-application-notes">Notes (optional)</label>
+                  <textarea class="input" id="student-application-notes" rows="3" maxlength="1000"></textarea>
+                </div>
+              </div>
+              <div class="student-form-controls">
+                <button class="btn btn--secondary" type="button" id="student-application-cancel">Cancel</button>
+                <button class="btn btn--primary" type="submit" id="student-application-save">Save application</button>
+              </div>
+              <p class="auth-status" id="student-application-message" role="status" aria-live="polite"></p>
+              <button class="btn btn--text" type="button" id="student-application-duplicate-edit" hidden></button>
+            </form>
+            <div class="student-application-filters">
+              <div class="field-group">
+                <label for="student-application-filter-status">Filter by status</label>
+                <select class="select" id="student-application-filter-status">
+                  <option value="">All statuses</option>
+                  <option value="Applied">Applied</option>
+                  <option value="Viewed">Viewed</option>
+                  <option value="In Review">In Review</option>
+                  <option value="Shortlisted">Shortlisted</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="student-application-filter-search">Search applications</label>
+                <input class="input" id="student-application-filter-search" type="search" placeholder="Job title or company">
+              </div>
+            </div>
+            <p class="auth-status" id="student-application-list-message" role="status" aria-live="polite"></p>
+            <ul class="student-application-list" id="student-application-list"></ul>
+          </div>
         </section>
 
         <section class="student-view" id="student-profile-view" hidden>
@@ -421,15 +516,14 @@
                 </div>
 
                 <div class="field-group field-group--full">
-                  <label>Skills</label>
+                  <label for="student-skill-name">Skills</label>
                   <div class="skill-adder">
-                    <input class="input" id="student-skill-name" type="text" placeholder="Add a skill">
+                    <input class="input" id="student-skill-name" type="text" placeholder="Add a skill" aria-describedby="student-skill-error">
                     <select class="select" id="student-skill-level" aria-label="Skill proficiency level">
                       <option value="">Select level (optional)</option>
                       <option value="Beginner">Beginner</option>
                       <option value="Intermediate">Intermediate</option>
                       <option value="Advanced">Advanced</option>
-                      <option value="Expert">Expert</option>
                     </select>
                     <select class="select" id="student-skill-project" aria-label="Link skill to project">
                       <option value="">Link to project (optional)</option>
@@ -437,7 +531,7 @@
                     <button class="btn btn--secondary" type="button" id="student-skill-add">Add skill</button>
                   </div>
                   <ul class="skill-list" id="student-skill-list" aria-live="polite"></ul>
-                  <p class="field-error" id="student-skill-error" aria-live="polite"></p>
+                  <p class="field-error" id="student-skill-error" role="status" aria-live="polite"></p>
                 </div>
 
                 <div class="field-group field-group--full">
@@ -446,42 +540,42 @@
                 </div>
 
                 <div class="field-group field-group--full">
-                  <label>Proof of Work</label>
+                  <label>Projects &amp; Proof of Work</label>
                   <div class="student-project-editor">
                     <div class="student-form-grid">
                       <div class="field-group">
-                        <label for="student-project-title">Project title</label>
-                        <input class="input" id="student-project-title" type="text" placeholder="NEXORA dashboard redesign">
+                        <label for="student-project-title">Project title (required)</label>
+                        <input class="input" id="student-project-title" type="text" aria-describedby="student-project-title-error" required placeholder="Project name">
                         <p class="field-error" id="student-project-title-error" aria-live="polite"></p>
                       </div>
 
                       <div class="field-group">
-                        <label for="student-project-role">Project role</label>
-                        <input class="input" id="student-project-role" type="text" placeholder="Frontend engineer">
+                        <label for="student-project-role">Your role or contribution (required)</label>
+                        <input class="input" id="student-project-role" type="text" aria-describedby="student-project-role-error" required placeholder="What did you contribute?">
                         <p class="field-error" id="student-project-role-error" aria-live="polite"></p>
                       </div>
 
                       <div class="field-group field-group--full">
-                        <label for="student-project-description">Project description</label>
-                        <textarea class="input" id="student-project-description" rows="4" placeholder="Describe the problem, decisions, and outcome"></textarea>
+                        <label for="student-project-description">Project description (required)</label>
+                        <textarea class="input" id="student-project-description" rows="4" aria-describedby="student-project-description-error" required placeholder="Describe the project"></textarea>
                         <p class="field-error" id="student-project-description-error" aria-live="polite"></p>
                       </div>
 
                       <div class="field-group field-group--full">
-                        <label for="student-project-technologies">Technologies used</label>
-                        <input class="input" id="student-project-technologies" type="text" placeholder="React, TypeScript, Node.js, PostgreSQL">
+                        <label for="student-project-technologies">Technologies used (required)</label>
+                        <input class="input" id="student-project-technologies" type="text" aria-describedby="student-project-technologies-error" required placeholder="HTML, CSS, JavaScript">
                         <p class="field-error" id="student-project-technologies-error" aria-live="polite"></p>
                       </div>
 
                       <div class="field-group">
                         <label for="student-project-github">GitHub repository URL (optional)</label>
-                        <input class="input" id="student-project-github" type="url" inputmode="url" placeholder="https://github.com/yourname/project">
+                        <input class="input" id="student-project-github" type="url" inputmode="url" aria-describedby="student-project-github-error" placeholder="https://github.com/you/project">
                         <p class="field-error" id="student-project-github-error" aria-live="polite"></p>
                       </div>
 
                       <div class="field-group">
                         <label for="student-project-demo">Live demo URL (optional)</label>
-                        <input class="input" id="student-project-demo" type="url" inputmode="url" placeholder="https://yourproject.example.com">
+                        <input class="input" id="student-project-demo" type="url" inputmode="url" aria-describedby="student-project-demo-error" placeholder="https://example.com">
                         <p class="field-error" id="student-project-demo-error" aria-live="polite"></p>
                       </div>
                     </div>
@@ -492,7 +586,7 @@
                     </div>
                   </div>
                   <ul class="student-project-list" id="student-project-list" aria-live="polite"></ul>
-                  <p class="field-error" id="student-project-error" aria-live="polite"></p>
+                  <p class="auth-status" id="student-project-error" role="status" aria-live="polite"></p>
                 </div>
 
                 <div class="field-group">
@@ -509,7 +603,7 @@
               </div>
 
               <div class="student-form-controls">
-                <button class="btn btn--secondary" type="button" data-student-route="dashboard">Cancel</button>
+                <button class="btn btn--secondary" type="button" id="student-profile-cancel">Cancel</button>
                 <button class="btn btn--primary" type="submit">Save profile</button>
               </div>
 
@@ -542,20 +636,28 @@
             </div>
             <button class="btn btn--primary" type="button" data-recruiter-create>New job draft</button>
           </div>
-          <p class="recruiter-notice">Listings here are saved only in this browser. Marking a listing Published is a demo status and does not publish it to the public job explorer or verify the employer.</p>
+          <p class="recruiter-notice">Listings are saved only in this browser. Published entries appear in this browser’s job explorer, but are not shared with other visitors or verified by NEXORA.</p>
           <div class="recruiter-metrics" aria-live="polite">
             <article class="student-card recruiter-metric">
               <h3>Total listings</h3>
               <strong id="recruiter-total-count">0</strong>
             </article>
             <article class="student-card recruiter-metric">
-              <h3>Active listings</h3>
+              <h3>Published</h3>
               <strong id="recruiter-active-count">0</strong>
-              <p>Marked Published locally; not publicly listed</p>
+              <p>Visible in this browser’s job explorer only</p>
             </article>
             <article class="student-card recruiter-metric">
               <h3>Draft listings</h3>
               <strong id="recruiter-draft-count">0</strong>
+            </article>
+            <article class="student-card recruiter-metric">
+              <h3>Closed listings</h3>
+              <strong id="recruiter-closed-count">0</strong>
+            </article>
+            <article class="student-card recruiter-metric">
+              <h3>Unpublished listings</h3>
+              <strong id="recruiter-unpublished-count">0</strong>
             </article>
           </div>
           <section class="student-card recruiter-recent">
@@ -575,8 +677,24 @@
             </div>
             <button class="btn btn--primary" type="button" data-recruiter-create>Create job draft</button>
           </div>
-          <p class="recruiter-notice">These are private, local demo records. They are not visible to job seekers and are not verified by NEXORA.</p>
+          <p class="recruiter-notice">Listings are saved in this browser only. Published entries appear in this browser’s job explorer, but are not shared with other visitors or verified by NEXORA.</p>
           <p class="auth-status" id="recruiter-listing-status" role="status" aria-live="polite"></p>
+          <div class="recruiter-filters">
+            <div class="field-group">
+              <label for="recruiter-listing-search">Search your listings</label>
+              <input class="input" id="recruiter-listing-search" type="search" autocomplete="off" placeholder="Search by job title">
+            </div>
+            <div class="field-group">
+              <label for="recruiter-listing-filter">Filter by status</label>
+              <select class="select" id="recruiter-listing-filter">
+                <option value="all">All statuses</option>
+                <option value="Draft">Draft</option>
+                <option value="Published">Published</option>
+                <option value="Closed">Closed</option>
+                <option value="Unpublished">Unpublished</option>
+              </select>
+            </div>
+          </div>
           <ul class="recruiter-list" id="recruiter-listings"></ul>
         </section>
 
@@ -585,7 +703,7 @@
             <div class="student-card__head">
               <div>
                 <p class="student-banner__eyebrow">Local demo listing</p>
-                <h2 id="recruiter-editor-title">Create a job draft</h2>
+                <h2 id="recruiter-editor-title">Create Job</h2>
               </div>
               <button class="btn btn--text" type="button" data-recruiter-route="listings">Back to listings</button>
             </div>
@@ -638,29 +756,77 @@
                   <input class="input" id="recruiter-skills" name="requiredSkills" type="text" maxlength="500" placeholder="Separate skills with commas" required>
                   <p class="field-error" id="recruiter-skills-error" aria-live="polite"></p>
                 </div>
+                <div class="field-group field-group--full">
+                  <label for="recruiter-eligibility">Eligibility</label>
+                  <textarea class="input" id="recruiter-eligibility" name="eligibility" rows="3" maxlength="1500" required></textarea>
+                  <p class="field-error" id="recruiter-eligibility-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-experience">Experience level</label>
+                  <select class="select" id="recruiter-experience" name="experience" required>
+                    <option value="">Select experience level</option>
+                    <option value="Entry-level">Entry-level / Fresher</option>
+                    <option value="Internship">Internship</option>
+                    <option value="Experienced">Experienced</option>
+                  </select>
+                  <p class="field-error" id="recruiter-experience-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-deadline">Application deadline</label>
+                  <input class="input" id="recruiter-deadline" name="deadline" type="date" required>
+                  <p class="field-error" id="recruiter-deadline-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-salary-min">Salary range (optional)</label>
+                  <div class="recruiter-salary">
+                    <input class="input" id="recruiter-salary-min" name="salaryMin" type="number" min="1" step="1" inputmode="numeric" aria-label="Minimum salary">
+                    <span aria-hidden="true">to</span>
+                    <input class="input" id="recruiter-salary-max" name="salaryMax" type="number" min="1" step="1" inputmode="numeric" aria-label="Maximum salary">
+                  </div>
+                  <p class="field-error" id="recruiter-salary-min-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="recruiter-salary-currency">Salary currency and period</label>
+                  <div class="recruiter-salary">
+                    <select class="select" id="recruiter-salary-currency" name="salaryCurrency" aria-label="Salary currency">
+                      <option value="INR">INR</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                    <select class="select" id="recruiter-salary-period" name="salaryPeriod" aria-label="Salary period">
+                      <option value="year">Per year</option>
+                      <option value="month">Per month</option>
+                      <option value="hour">Per hour</option>
+                    </select>
+                  </div>
+                </div>
                 <div class="field-group">
                   <label for="recruiter-apply-url">Official application URL (optional)</label>
                   <input class="input" id="recruiter-apply-url" name="applyUrl" type="url" inputmode="url" placeholder="https://company.example/careers/role">
                   <p class="field-error" id="recruiter-apply-url-error" aria-live="polite"></p>
                 </div>
-                <div class="field-group">
-                  <label for="recruiter-status">Listing status</label>
-                  <select class="select" id="recruiter-status" name="status">
-                    <option value="Draft">Draft</option>
-                    <option value="Published">Published (demo status only)</option>
-                    <option value="Closed">Closed</option>
-                  </select>
-                  <p class="field-error" id="recruiter-status-error" aria-live="polite"></p>
-                </div>
               </div>
-              <p class="recruiter-notice">Saving as Published only changes this local record’s status. It does not make the job public, verified, or available to apply to.</p>
+              <p class="recruiter-notice">This is a local demo listing. Publishing makes it visible only in this browser’s job explorer. It is not shared, verified, or hosted on a real server.</p>
               <div class="student-form-controls recruiter-form-controls">
                 <button class="btn btn--text" type="button" data-recruiter-route="listings">Cancel</button>
-                <button class="btn btn--secondary" type="button" id="recruiter-save-draft">Save draft</button>
-                <button class="btn btn--primary" type="submit" id="recruiter-save-listing">Save listing</button>
+                <button class="btn btn--secondary" type="button" id="recruiter-save-draft">Save as Draft</button>
+                <button class="btn btn--secondary" type="button" id="recruiter-preview-job">Preview Job</button>
+                <button class="btn btn--primary" type="submit" id="recruiter-save-listing" data-save-mode="publish">Publish Job</button>
               </div>
               <p class="auth-status" id="recruiter-form-status" aria-live="polite"></p>
             </form>
+            <section id="recruiter-preview" class="recruiter-preview" hidden aria-labelledby="recruiter-preview-title">
+              <div class="student-card__head">
+                <h3 id="recruiter-preview-title">Job preview</h3>
+                <span class="recruiter-status recruiter-status--unpublished">Local demo preview</span>
+              </div>
+              <div id="recruiter-preview-content"></div>
+              <div class="student-form-controls recruiter-form-controls">
+                <button class="btn btn--secondary" type="button" id="recruiter-preview-back">Back to editing</button>
+                <button class="btn btn--primary" type="button" id="recruiter-preview-publish">Publish Job</button>
+              </div>
+            </section>
           </div>
         </section>
       </div>

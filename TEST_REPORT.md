@@ -1,5 +1,28 @@
 # NEXORA — Test Report
 
+## Demo profile and My Applications tracker — current change
+
+### Integrated-browser checks performed
+
+- Opened **Get Started**, completed onboarding with test-only entries, and reached the student dashboard. The dashboard displayed a completion prompt because optional core profile fields were still incomplete; no profile details were generated.
+- Added an application for an available listing with a student-entered date, source, Applied status, and note. The saved profile contained one record and the dashboard preview showed the same title, company, date, status, source, and note.
+- Added a separate manual-entry record without linking a listing and verified its title, company, date, source, In Review status, and notes were saved and rendered.
+- Attempted to add that listing again. Duplicate detection prevented a second record and exposed **Edit existing application**. Used that action to change the status to Viewed and update notes without adding a record.
+- Reloaded and confirmed status and notes persisted. The same record appeared on the dashboard and tracker page. Status filtering showed the matching record and a useful no-match state for another status.
+- Edited the student profile after adding an application; the profile save preserved the application. Bookmark add/remove worked. Created a temporary recruiter draft through the existing form, verified it persisted and incremented the dashboard count, then restored the recruiter storage fixture.
+- Removed an application through the confirmation prompt and verified that the profile array became empty and both dashboard and tracker showed the honest empty state. An application-only profile also reopened the dashboard correctly.
+- Exercised an external Apply Now review using a temporary browser-local recruiter listing fixture. Intercepted the destination click to stay on the test page; the redirect disclosure appeared and no Applied record was created. **I've applied · record it** opened a form prefilled with the job and Applied status but did not save anything until the student completed and submitted the form.
+- At 390px, the application form/list rendered without horizontal overflow. A malformed applications value displayed a safe empty state and left the skill data intact.
+- Empty required fields set `aria-invalid` and focused the first invalid control. A future application date was rejected and no record was written.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parser and duplicate-ID check — PASS.
+
+### Automated suite and remaining checks
+
+- `python tests\regression_test.py` was attempted but could not start because `playwright` is not installed (`ModuleNotFoundError`). No result from that suite is claimed.
+- No cross-browser, screen-reader, keyboard-only, or physical-device check was performed.
+- Browser QA fixtures were restored after testing; this was not a test of real employer submission or employer status syncing.
+
 ## Phase 3, Step 3.1 — recruiter portal browser validation
 
 Actual checks performed in the integrated browser against a temporary local HTTP server:
@@ -22,18 +45,85 @@ What was not performed for Step 3.1:
 - No dedicated cross-browser, screen-reader, keyboard-only, storage-quota, or real-device test was performed.
 - No backend or public listing endpoint exists, so no real publishing, account, company verification, or external application flow was testable.
 
-## Phase 2, Step 2.2 — static validation only
+## Phase 2, Step 2.2 — student dashboard/profile bug-fix validation
 
-Actual checks performed in this session:
+### Interactive checks performed
 
-- `node --check assets/js/main.js` — PASS
-- Local static HTTP response check for the project directory — PASS
+Checks were run in the integrated browser against the local `file://` page. Test profile, session and bookmark values were restored after each flow.
 
-What was not performed:
-- No browser automation / Playwright UI checks were run for the student dashboard/profile flow in this environment.
-- No interactive browser assertions were executed for dashboard navigation, saved-job synchronization, or profile editing.
+- **Get Started → onboarding:** opened the onboarding form directly from the mobile-menu Get Started control; name, headline, education, career interests and skill were entered. Optional preferences did not block progress.
+- **Preview and Finish:** the summary showed the skill name (not `[object Object]`) and did not write a profile before Finish. Finish saved the entered profile and opened the student dashboard.
+- **Completion:** the populated test profile displayed `100%` and `5 of 5 core fields complete`.
+- **Partial completion:** a profile with four of five core fields displayed `80%` and `4 of 5`; an optional saved project did not raise the percentage. A legacy string skill still appeared in the profile overview.
+- **Dashboard and profile consistency:** saved name and headline loaded into the Profile form and were displayed in the dashboard overview.
+- **Cancel and Save:** a partial profile saved successfully; Cancel discarded an unsaved headline edit and cleared its validation error.
+- **Refresh:** saved profile and bookmark data remained present after reload; the dashboard reopened with the saved name and profile overview.
+- **Saved Jobs:** bookmarking a job updated the existing `nexora:demo-saved` key.
+- **Job explorer regression:** keyword search for “frontend” returned the expected title, the Internship filter returned three cards, job details opened, and Apply Now on demo data stayed honest without opening an application destination.
+- **My Applications:** the honest “No applications recorded” state appeared with no submissions. An in-memory external redirect record was also verified not to appear as an application.
+- **Malformed storage:** malformed profile JSON resulted in a safe 0% profile display without JavaScript errors; the six job cards remained, and bookmark/recruiter storage values were unchanged.
+- **Runtime errors:** no page errors were observed during the completed interactive flows.
 
-This means Step 2.2 is verified as a static front-end change, but not as a fully browser-tested feature set until a proper headless browser environment is available.
+### Static checks performed
+
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parsing — PASS; no duplicate IDs in `index.html`.
+
+### Not performed / blocked
+
+- `python tests/regression_test.py` was attempted but could not start: `ModuleNotFoundError: No module named 'playwright'`. No result from the existing Playwright suite is claimed.
+- No dedicated cross-browser, screen-reader, keyboard-only audit, storage-quota test, or multi-viewport responsive audit was performed.
+- No backend application submission or persisted application history exists to test. External redirects are not submissions.
+
+## Phase 2, Step 2.3 Part 1 — Student Skills Management
+
+### Interactive checks performed
+
+Checks were run in the integrated browser against the local `file://` page with test profile/session/bookmark/recruiter values restored afterward.
+
+- Add by button saved a skill in the existing profile key; with no level selected, the saved level remained empty.
+- Add by Enter saved a skill with the explicitly selected Advanced level and Self-declared evidence.
+- Pressing Enter with an empty skill displayed inline validation. A case-only duplicate (`jAvAsCrIpT` vs. `JavaScript`) was rejected without changing the saved skill count.
+- Edit loaded the selected skill. After correcting a narrow/overlapping hit target, clicking Edit updated the existing record ID, preserved its selected Intermediate level, and did not create a duplicate.
+- Remove deleted only the selected skill. The updated list remained in sync with the dashboard profile overview.
+- New and edited skills and the chosen level survived reload. Adding a skill that completed the fifth core field updated profile completion to 100%.
+- Removing the final skill reduced completion from 100% to 80% and showed the no-skills empty state.
+- At 390px width, the skill tags and controls remained visible and the page had no horizontal overflow.
+- No page errors occurred during the completed skill flows.
+
+### Static checks performed
+
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse and duplicate-ID check — PASS.
+- `python tests/regression_test.py` was attempted but could not start: `ModuleNotFoundError: No module named 'playwright'`. No result from that suite is claimed.
+
+## Phase 2, Step 2.3 Part 2 — Student Projects & Proof-of-Work Portfolio
+
+### Interactive checks performed
+
+Checks were performed in the integrated browser against the local `file://` page. Test values for profile, session, bookmarks, and recruiter listings were restored afterwards.
+
+- **Empty state and required validation:** no-project state appeared; saving an empty form showed required-field errors for title, description, technologies, and role/contribution.
+- **URL validation:** a `javascript:` repository URL was rejected. A credential-bearing URL was also rejected. The project was not saved while either invalid URL was present.
+- **Create and safe rendering:** a project with an HTML-like title and description saved as plain text, with no injected elements. “Project added by student” appeared; the existing saved skill record remained unchanged.
+- **Links:** valid repository and demo links appeared with `_blank` and `rel="noopener noreferrer"`; repository display said “Repository link provided”.
+- **Edit:** edit loaded the saved project fields. Save updated the existing project rather than creating a duplicate. The dashboard profile overview displayed the edited title and technologies.
+- **Delete:** dismissing the confirmation preserved the project; accepting the confirmation removed it and restored the empty state.
+- **Persistence and completion:** project and skill data survived reload. Completion stayed at 100% after deleting the project because projects are optional and the profile still had all five core fields.
+- **Malformed/unsafe saved data:** a non-array projects value produced the empty state; a legacy project with HTML in its title displayed safely and its unsafe `javascript:` and credential-bearing links were not rendered.
+- **Responsive and regression smoke checks:** at 390px the project controls remained visible without horizontal overflow. Existing skills were retained; job search/filter, bookmark add/remove, job details, and the honest demo Apply Now flow worked. Onboarding could be opened and guest browsing returned; recruiter portal navigation remained reachable.
+- **Runtime errors:** no JavaScript page errors were observed during the completed project and regression flows.
+
+### Static checks performed
+
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parsing and duplicate-ID detection — PASS.
+- `python tests/regression_test.py` was attempted but could not start: `ModuleNotFoundError: No module named 'playwright'`. No result from that suite is claimed.
+
+### Remaining manual checks
+
+- No cross-browser, screen-reader, keyboard-only audit, or physical-device testing was performed.
+- No real repository validation, contribution verification, or backend persistence exists; project labels describe student-entered data only.
 
 ## Phase 1, Step 1.3 — browser-tested report
 
