@@ -867,6 +867,44 @@
                   <input class="input" id="student-profile-portfolio" name="portfolioUrl" type="url" inputmode="url" placeholder="https://yourportfolio.com">
                   <p class="field-error" id="student-profile-portfolio-error" aria-live="polite"></p>
                 </div>
+
+                <div class="field-group field-group--full">
+                  <label>GitHub portfolio</label>
+                  <p class="student-item__meta">Public GitHub repository data is loaded from GitHub's public API when available. If the API is blocked or a repository is deleted, you can still save a valid public repository URL and keep the information you explicitly provided.</p>
+                  <div class="student-form-grid">
+                    <div class="field-group field-group--full">
+                      <label for="student-github-repository-url">Repository URL</label>
+                      <input class="input" id="student-github-repository-url" type="url" inputmode="url" placeholder="https://github.com/yourname/project">
+                    </div>
+                    <div class="field-group">
+                      <label for="student-github-repository-name">Repository name</label>
+                      <input class="input" id="student-github-repository-name" type="text" maxlength="120" placeholder="Project name or repo name">
+                    </div>
+                    <div class="field-group">
+                      <label for="student-github-repository-project">Associate with project</label>
+                      <select class="select" id="student-github-repository-project">
+                        <option value="">Associate with a project (optional)</option>
+                      </select>
+                    </div>
+                    <div class="field-group field-group--full">
+                      <label for="student-github-repository-description">Repository description</label>
+                      <textarea class="input" id="student-github-repository-description" rows="3" maxlength="500" placeholder="Describe what this repository demonstrates."></textarea>
+                    </div>
+                    <div class="field-group field-group--full">
+                      <label for="student-github-repository-skill">Associated skill</label>
+                      <select class="select" id="student-github-repository-skill">
+                        <option value="">Associate with a skill (optional)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="student-form-controls student-form-controls--left">
+                    <button class="btn btn--secondary" type="button" id="student-github-fetch-details">Fetch repo details</button>
+                    <button class="btn btn--primary" type="button" id="student-github-add-repository">Add repository</button>
+                    <button class="btn btn--text" type="button" id="student-github-clear-repository">Clear</button>
+                  </div>
+                  <p class="auth-status" id="student-github-status" role="status" aria-live="polite"></p>
+                  <ul class="student-project-list" id="student-github-repository-list" aria-live="polite"></ul>
+                </div>
               </div>
 
               <div class="student-form-controls">

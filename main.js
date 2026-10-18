@@ -889,6 +889,81 @@
     }).filter(Boolean).slice(0, 12);
   }
 
+  function normalizeGitHubRepositoryUrl(value) {
+    var raw = String(value || "").trim();
+    if (!raw) return null;
+    var candidate = raw.replace(/\s+/g, "");
+    try {
+      var parsed = new URL(candidate);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      if (parsed.hostname.toLowerCase() !== "github.com") return null;
+      var segments = parsed.pathname.split("/").filter(Boolean);
+      if (segments.length !== 2) return null;
+      var owner = segments[0];
+      var repo = segments[1];
+      if (!owner || !repo || owner === "." || repo === ".") return null;
+      return {
+        owner: owner,
+        repo: repo,
+        fullName: owner + "/" + repo,
+        url: "https://github.com/" + owner + "/" + repo
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function isGitHubProfileUrl(value) {
+    var raw = String(value || "").trim();
+    if (!raw) return false;
+    try {
+      var parsed = new URL(raw);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+      if (parsed.hostname.toLowerCase() !== "github.com") return false;
+      var segments = parsed.pathname.split("/").filter(Boolean);
+      return segments.length >= 1 && segments.length <= 2 && !!segments[0];
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function isGitHubRepositoryUrl(value) {
+    return !!normalizeGitHubRepositoryUrl(value);
+  }
+
+  function normalizeGitHubRepositoryEntries(value) {
+    if (!Array.isArray(value)) return [];
+    var seen = Object.create(null);
+    return value.map(function (entry, index) {
+      var item = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
+      var repoUrl = String(item.url || item.repositoryUrl || item.html_url || "").trim();
+      var parsed = normalizeGitHubRepositoryUrl(repoUrl);
+      var explicitName = String(item.name || item.fullName || item.repo || "").trim();
+      var fullName = parsed ? parsed.fullName : String(item.fullName || explicitName || "").trim();
+      var repoName = String(item.repo || item.name || (fullName ? fullName.split("/")[1] : "")).trim();
+      var normalizedUrl = parsed ? parsed.url : (isHttpUrl(repoUrl) ? repoUrl : "");
+      if (!normalizedUrl) return null;
+      var key = normalizedUrl.toLowerCase();
+      if (seen[key]) return null;
+      seen[key] = true;
+      var topics = Array.isArray(item.topics) ? item.topics.map(function (topic) { return String(topic || "").trim(); }).filter(Boolean) : [];
+      var skillIds = Array.isArray(item.skillIds) ? item.skillIds : (item.skillId ? [item.skillId] : []);
+      return {
+        id: String(item.id || "github_repo_" + index),
+        name: repoName || (fullName ? fullName.split("/")[1] : "Repository"),
+        fullName: fullName || normalizedUrl.replace(/^https?:\/\//i, "").replace(/^github\.com\//i, ""),
+        description: String(item.description || "").trim(),
+        url: normalizedUrl,
+        language: String(item.language || "").trim(),
+        topics: topics.slice(0, 8),
+        projectId: String(item.projectId || "").trim(),
+        skillIds: skillIds.map(String).filter(Boolean).slice(0, 5),
+        source: item.source === "api" ? "api" : "manual",
+        fetchedAt: String(item.fetchedAt || "").trim()
+      };
+    }).filter(Boolean).slice(0, 20);
+  }
+
   function normalizeStudentProfile(profile) {
     var source = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {};
     var skills = Array.isArray(source.skills) ? source.skills.map(function (skill, index) {
@@ -983,6 +1058,7 @@
       careerInterests: String(source.careerInterests || "").trim(),
       githubUrl: String(source.githubUrl || "").trim(),
       portfolioUrl: String(source.portfolioUrl || "").trim(),
+      githubRepositories: normalizeGitHubRepositoryEntries(source.githubRepositories),
       email: String(source.email || "").trim(),
       role: String(source.role || "").trim(),
       updatedAt: source.updatedAt || ""
@@ -991,7 +1067,7 @@
 
   function studentProfileHasData(profile) {
     var p = normalizeStudentProfile(profile);
-    return !!(p.fullName || p.headline || p.educationLevel || p.collegeName || p.graduationYear || p.desiredRoles || p.opportunityType || p.workMode || p.preferredLocations || p.skills.length || p.projects.length || p.applications.length || p.skillGapAnalysis || p.careerInterests || p.githubUrl || p.portfolioUrl || p.email || p.role);
+    return !!(p.fullName || p.headline || p.educationLevel || p.collegeName || p.graduationYear || p.desiredRoles || p.opportunityType || p.workMode || p.preferredLocations || p.skills.length || p.projects.length || p.applications.length || p.skillGapAnalysis || p.careerInterests || p.githubUrl || p.portfolioUrl || p.githubRepositories.length || p.email || p.role);
   }
 
   function setStudentStatus(message) {
@@ -1025,7 +1101,7 @@
   function studentFieldErrorMap(profileData) {
     var errors = {};
     if (!profileData.fullName) errors["student-profile-name"] = "Please enter your full name.";
-    if (profileData.githubUrl && !isHttpUrl(profileData.githubUrl)) errors["student-profile-github"] = "Use a valid http(s) URL.";
+    if (profileData.githubUrl && !isGitHubProfileUrl(profileData.githubUrl)) errors["student-profile-github"] = "Use a valid public GitHub profile URL such as https://github.com/yourname.";
     if (profileData.portfolioUrl && !isHttpUrl(profileData.portfolioUrl)) errors["student-profile-portfolio"] = "Use a valid http(s) URL.";
     return errors;
   }
@@ -1045,6 +1121,29 @@
     }).join("");
     if (currentValue && profile.projects.some(function (project) { return project.id === currentValue; })) {
       select.value = currentValue;
+    }
+  }
+
+  function populateGitHubRepositoryAssociationFields(profile) {
+    var projectSelect = document.getElementById("student-github-repository-project");
+    var skillSelect = document.getElementById("student-github-repository-skill");
+    if (projectSelect) {
+      var currentProject = projectSelect.value;
+      projectSelect.innerHTML = '<option value="">Associate with a project (optional)</option>' + profile.projects.map(function (project) {
+        return '<option value="' + escapeHtml(project.id) + '">' + escapeHtml(project.title) + '</option>';
+      }).join("");
+      if (currentProject && profile.projects.some(function (project) { return project.id === currentProject; })) {
+        projectSelect.value = currentProject;
+      }
+    }
+    if (skillSelect) {
+      var currentSkill = skillSelect.value;
+      skillSelect.innerHTML = '<option value="">Associate with a skill (optional)</option>' + profile.skills.map(function (skill) {
+        return '<option value="' + escapeHtml(skill.id) + '">' + escapeHtml(skill.name) + '</option>';
+      }).join("");
+      if (currentSkill && profile.skills.some(function (skill) { return skill.id === currentSkill; })) {
+        skillSelect.value = currentSkill;
+      }
     }
   }
 
@@ -1068,9 +1167,11 @@
       var input = document.getElementById(id);
       if (input) input.value = values[id] || "";
     });
+    populateGitHubRepositoryAssociationFields(p);
     renderProjectOptions();
     renderStudentSkillEditor();
     renderStudentProjectEditor();
+    renderGitHubRepositoryList();
   }
 
   function clearStudentSkillForm() {
@@ -1098,6 +1199,8 @@
     if (skillName) skillName.setAttribute("aria-invalid", isError ? "true" : "false");
   }
 
+  var studentGitHubRepositoryDraftId = "";
+
   function clearStudentProjectForm() {
     ["student-project-title", "student-project-role", "student-project-description", "student-project-technologies", "student-project-github", "student-project-demo"].forEach(function (id) {
       var el = document.getElementById(id);
@@ -1110,6 +1213,176 @@
     var clearButton = document.getElementById("student-project-clear");
     if (clearButton) clearButton.textContent = "Clear";
     setStudentProjectMessage("");
+  }
+
+  function setGitHubRepositoryStatus(message, isError) {
+    var status = document.getElementById("student-github-status");
+    if (status) status.textContent = message || "";
+    if (status) status.setAttribute("data-error", isError ? "true" : "false");
+  }
+
+  function clearGitHubRepositoryForm() {
+    ["student-github-repository-url", "student-github-repository-name", "student-github-repository-description", "student-github-repository-project", "student-github-repository-skill"].forEach(function (id) {
+      var element = document.getElementById(id);
+      if (element) element.value = "";
+    });
+    studentGitHubRepositoryDraftId = "";
+    setGitHubRepositoryStatus("");
+    populateGitHubRepositoryAssociationFields(normalizeStudentProfile(readDemoProfile()));
+  }
+
+  function fetchGitHubRepositoryMetadata(repoUrl) {
+    var parsed = normalizeGitHubRepositoryUrl(repoUrl);
+    if (!parsed) {
+      return Promise.resolve({ ok: false, message: "Use a valid public GitHub repository URL such as https://github.com/owner/repo." });
+    }
+    var apiUrl = "https://api.github.com/repos/" + encodeURIComponent(parsed.owner) + "/" + encodeURIComponent(parsed.repo);
+    return fetch(apiUrl, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }).then(function (response) {
+      if (response.status === 403) {
+        throw new Error("GitHub rate limit reached while loading public repository metadata. You can still save the repository URL manually.");
+      }
+      if (response.status === 404) {
+        throw new Error("This public repository could not be found or may have been deleted.");
+      }
+      if (!response.ok) {
+        throw new Error("GitHub is currently unavailable. You can still save the public repository URL manually.");
+      }
+      return response.json();
+    }).then(function (data) {
+      return {
+        ok: true,
+        entry: {
+          name: String(data.name || parsed.repo).trim(),
+          fullName: String(data.full_name || parsed.fullName).trim(),
+          description: String(data.description || "").trim(),
+          language: String(data.language || "").trim(),
+          topics: Array.isArray(data.topics) ? data.topics.map(function (topic) { return String(topic || "").trim(); }).filter(Boolean).slice(0, 8) : [],
+          url: String(data.html_url || parsed.url).trim(),
+          source: "api",
+          fetchedAt: new Date().toISOString()
+        }
+      };
+    }).catch(function (error) {
+      return { ok: false, message: error && error.message ? error.message : "This public repository could not be loaded from GitHub right now." };
+    });
+  }
+
+  function renderGitHubRepositoryList() {
+    var list = document.getElementById("student-github-repository-list");
+    if (!list) return;
+    var profile = normalizeStudentProfile(readDemoProfile());
+    if (!profile.githubRepositories.length) {
+      list.innerHTML = '<li class="empty--compact"><h3>No public repositories linked yet</h3><p>Add a valid public GitHub repository to showcase your work and connect it to a project or skill.</p></li>';
+      return;
+    }
+    list.innerHTML = profile.githubRepositories.map(function (repo) {
+      var association = [];
+      if (repo.projectId) {
+        var linkedProject = profile.projects.find(function (project) { return project.id === repo.projectId; });
+        if (linkedProject) association.push('Project: ' + escapeHtml(linkedProject.title));
+      }
+      if (repo.skillIds && repo.skillIds.length) {
+        var skillNames = repo.skillIds.map(function (skillId) {
+          var matched = profile.skills.find(function (skill) { return skill.id === skillId; });
+          return matched ? matched.name : "";
+        }).filter(Boolean);
+        if (skillNames.length) association.push('Skill: ' + escapeHtml(skillNames.join(", ")));
+      }
+      var topics = repo.topics.length ? '<span class="student-evidence">Topics: ' + escapeHtml(repo.topics.join(", ")) + '</span>' : '<span class="student-evidence">Topics: not supplied</span>';
+      var language = repo.language ? '<span class="student-evidence">Language: ' + escapeHtml(repo.language) + '</span>' : '<span class="student-evidence">Language: not supplied</span>';
+      var metadataFlag = repo.source === "api" ? '<span class="student-evidence">API-fetched public metadata</span>' : '<span class="student-evidence">Student-provided public metadata</span>';
+      return '<li class="student-project-item"><div class="student-project-item__meta"><strong><a class="link" href="' + escapeHtml(repo.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(repo.name || repo.fullName) + '</a></strong>' +
+        (repo.description ? '<span class="student-evidence">' + escapeHtml(repo.description) + '</span>' : '<span class="student-evidence">No description supplied.</span>') +
+        language + topics + metadataFlag + (association.length ? '<span class="student-evidence">' + escapeHtml(association.join(" · ")) + '</span>' : '') +
+        '</div><div class="student-project-item__actions"><button class="btn btn--text" type="button" data-student-github-repository-edit="' + escapeHtml(repo.id) + '">Edit</button><button class="btn btn--text" type="button" data-student-github-repository-delete="' + escapeHtml(repo.id) + '">Remove</button></div></li>';
+    }).join("");
+  }
+
+  function saveGitHubRepositoryToProfile() {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var repoUrl = document.getElementById("student-github-repository-url").value.trim();
+    var repoName = document.getElementById("student-github-repository-name").value.trim();
+    var repoDescription = document.getElementById("student-github-repository-description").value.trim();
+    var repoProjectId = document.getElementById("student-github-repository-project").value;
+    var repoSkillId = document.getElementById("student-github-repository-skill").value;
+    var parsed = normalizeGitHubRepositoryUrl(repoUrl);
+    if (!parsed) {
+      setGitHubRepositoryStatus("Use a valid public GitHub repository URL such as https://github.com/owner/repo.", true);
+      return;
+    }
+    var duplicate = profile.githubRepositories.find(function (item) {
+      return item.id !== studentGitHubRepositoryDraftId && item.url.toLowerCase() === parsed.url.toLowerCase();
+    });
+    if (duplicate) {
+      setGitHubRepositoryStatus("That repository is already linked to this profile.", true);
+      return;
+    }
+    var baseEntry = {
+      id: studentGitHubRepositoryDraftId || ("github_repo_" + Date.now() + Math.random().toString(16).slice(2)),
+      name: repoName || parsed.repo,
+      fullName: parsed.fullName,
+      description: repoDescription,
+      url: parsed.url,
+      language: "",
+      topics: [],
+      projectId: repoProjectId || "",
+      skillIds: repoSkillId ? [repoSkillId] : [],
+      source: "manual",
+      fetchedAt: ""
+    };
+    var existingIndex = profile.githubRepositories.findIndex(function (item) { return item.id === studentGitHubRepositoryDraftId; });
+    if (existingIndex >= 0) {
+      profile.githubRepositories[existingIndex] = Object.assign({}, profile.githubRepositories[existingIndex], baseEntry, { id: studentGitHubRepositoryDraftId });
+    } else {
+      profile.githubRepositories.push(baseEntry);
+    }
+    var currentProfile = readDemoProfile();
+    currentProfile.githubRepositories = profile.githubRepositories;
+    currentProfile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(currentProfile)) {
+      setGitHubRepositoryStatus("Could not save the GitHub repository in this browser. Check local storage settings and try again.", true);
+      return;
+    }
+    clearGitHubRepositoryForm();
+    renderGitHubRepositoryList();
+    renderStudentDashboard();
+    setGitHubRepositoryStatus("Repository saved to your public portfolio. It remains self-reported until a reviewer marks it otherwise.", false);
+  }
+
+  function editGitHubRepositoryEntry(repositoryId) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var repository = profile.githubRepositories.find(function (item) { return item.id === repositoryId; });
+    if (!repository) return;
+    document.getElementById("student-github-repository-url").value = repository.url || "";
+    document.getElementById("student-github-repository-name").value = repository.name || "";
+    document.getElementById("student-github-repository-description").value = repository.description || "";
+    document.getElementById("student-github-repository-project").value = repository.projectId || "";
+    document.getElementById("student-github-repository-skill").value = repository.skillIds && repository.skillIds.length ? repository.skillIds[0] : "";
+    studentGitHubRepositoryDraftId = repositoryId;
+    setGitHubRepositoryStatus("Editing repository. Save your changes or clear the form to cancel.", false);
+  }
+
+  function deleteGitHubRepositoryEntry(repositoryId) {
+    var profile = normalizeStudentProfile(readDemoProfile());
+    var repository = profile.githubRepositories.find(function (item) { return item.id === repositoryId; });
+    if (!repository || !window.confirm("Remove the public repository \"" + repository.name + "\" from your portfolio?")) return;
+    profile.githubRepositories = profile.githubRepositories.filter(function (item) { return item.id !== repositoryId; });
+    var currentProfile = readDemoProfile();
+    currentProfile.githubRepositories = profile.githubRepositories;
+    currentProfile.updatedAt = new Date().toISOString();
+    if (!writeDemoProfile(currentProfile)) {
+      setGitHubRepositoryStatus("Could not remove this repository in this browser. Check local storage settings and try again.", true);
+      return;
+    }
+    clearGitHubRepositoryForm();
+    renderGitHubRepositoryList();
+    renderStudentDashboard();
+    setGitHubRepositoryStatus("Repository removed from your public portfolio.", false);
   }
 
   function setStudentProjectMessage(message, isError) {
@@ -1408,11 +1681,11 @@
       ? "A repository link is listed (" + new URL(project.githubUrl).hostname + "); NEXORA has not inspected it."
       : "No repository link is listed.";
     return [
-      { category: "Architecture", text: "Based on your project summary (“" + description + (description.length >= 140 ? "…" : "") + "”), how did you structure its main components and how do they work together?" },
+      { category: "Project purpose and problem solved", text: "What problem did this project aim to solve, who was it for, and what outcome would make it successful? Use your saved summary (“" + description + (description.length >= 140 ? "…” : "") + "”) to frame the answer." },
+      { category: "Architecture", text: "Based on your project summary (“" + description + (description.length >= 140 ? "…” : "") + "”), how did you structure its main components and how do they work together?" },
       { category: "Implementation choices", text: "You listed " + technologies + ". Why were these technologies appropriate for this project, and what did you implement with them?" },
       { category: "Technical challenge", text: "What was a significant technical challenge in this project, and how did you approach solving it?" },
       { category: "Debugging", text: "Describe a bug or unexpected behavior you encountered, how you investigated it, and what evidence showed your fix worked. " + repoContext },
-      { category: "Trade-offs", text: "What implementation or design trade-off did you make, and what alternative did you consider?" },
       { category: "Individual contribution", text: "Your saved role is “" + role + "”. Which specific parts did you personally complete, and how would you explain your contribution to a reviewer?" }
     ];
   }
@@ -2528,8 +2801,17 @@
         return '<li class="student-item"><strong>' + escapeHtml(project.title) + '</strong><span class="student-item__meta">' + escapeHtml(project.description || "No description provided") + '</span><span class="student-item__meta">Technologies: ' + escapeHtml(project.technologies || "Not provided") + '</span><span class="student-item__meta">Role: ' + escapeHtml(project.role || "Not provided") + '</span><span class="student-item__meta">Project added by student</span>' + (projectLinks.length ? '<div class="student-project-item__links">' + projectLinks.join("") + '</div>' : '') + '</li>';
       }).join("") : '<li class="empty--compact"><h3>No proof-of-work projects yet</h3><p>Share important work samples and project outcomes.</p></li>';
 
+      var repositoriesHtml = profile.githubRepositories.length ? profile.githubRepositories.map(function (repo) {
+        var repoDescription = repo.description ? '<span class="student-item__meta">' + escapeHtml(repo.description) + '</span>' : '<span class="student-item__meta">No description supplied.</span>';
+        var extra = [];
+        if (repo.language) extra.push('Language: ' + repo.language);
+        if (repo.topics && repo.topics.length) extra.push('Topics: ' + repo.topics.join(', '));
+        return '<li class="student-item"><strong><a class="link" href="' + escapeHtml(repo.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(repo.name || repo.fullName) + '</a></strong>' + repoDescription + '<span class="student-item__meta">' + escapeHtml(extra.join(' • ') || 'Public GitHub repository') + '</span></li>';
+      }).join("") : '<li class="empty--compact"><h3>No public repositories yet</h3><p>Add a public GitHub link to show what you have built.</p></li>';
+
       studentOverview.innerHTML = '<div class="student-overview__section"><h4>Skills</h4><ul class="student-list">' + skillsHtml + '</ul></div>' +
         '<div class="student-overview__section"><h4>Projects</h4><ul class="student-list">' + projectsHtml + '</ul></div>' +
+        '<div class="student-overview__section"><h4>GitHub portfolio</h4><ul class="student-list">' + repositoriesHtml + '</ul></div>' +
         '<dl>' + [
           ["Name", profile.fullName || "Not provided"],
           ["Headline", profile.headline || "Not provided"],
@@ -2544,7 +2826,14 @@
           ["GitHub", profile.githubUrl || "Not provided"],
           ["Portfolio", profile.portfolioUrl || "Not provided"]
         ].map(function (entry) {
-          return '<dt>' + escapeHtml(entry[0]) + '</dt><dd>' + escapeHtml(entry[1]) + '</dd>';
+          var value = entry[1];
+          if (entry[0] === "GitHub" && isGitHubProfileUrl(value)) {
+            value = '<a class="link" href="' + escapeHtml(value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(value) + '</a>';
+          }
+          if (entry[0] === "Portfolio" && isHttpUrl(value)) {
+            value = '<a class="link" href="' + escapeHtml(value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(value) + '</a>';
+          }
+          return '<dt>' + escapeHtml(entry[0]) + '</dt><dd>' + value + '</dd>';
         }).join("") + '</dl>';
     }
     renderStudentRecommendations(profile);
@@ -3068,6 +3357,50 @@
       renderStudentDashboard();
     });
   }
+
+  var studentGithubFetchDetailsButton = document.getElementById("student-github-fetch-details");
+  if (studentGithubFetchDetailsButton) {
+    studentGithubFetchDetailsButton.addEventListener("click", function () {
+      var repoUrl = document.getElementById("student-github-repository-url").value.trim();
+      if (!repoUrl) {
+        setGitHubRepositoryStatus("Enter a public GitHub repository URL before fetching its details.", true);
+        return;
+      }
+      setGitHubRepositoryStatus("Loading public repository details from GitHub...", false);
+      fetchGitHubRepositoryMetadata(repoUrl).then(function (result) {
+        if (!result.ok) {
+          setGitHubRepositoryStatus(result.message || "GitHub metadata could not be loaded. You can still save the public repository URL manually.", true);
+          return;
+        }
+        var repository = result.entry;
+        document.getElementById("student-github-repository-name").value = repository.name || "";
+        document.getElementById("student-github-repository-description").value = repository.description || "";
+        setGitHubRepositoryStatus("Public repository metadata loaded from GitHub. Review it and save when ready.", false);
+      });
+    });
+  }
+
+  var studentGithubAddRepositoryButton = document.getElementById("student-github-add-repository");
+  if (studentGithubAddRepositoryButton) {
+    studentGithubAddRepositoryButton.addEventListener("click", saveGitHubRepositoryToProfile);
+  }
+
+  var studentGithubClearRepositoryButton = document.getElementById("student-github-clear-repository");
+  if (studentGithubClearRepositoryButton) {
+    studentGithubClearRepositoryButton.addEventListener("click", clearGitHubRepositoryForm);
+  }
+
+  document.addEventListener("click", function (event) {
+    var editButton = event.target.closest("[data-student-github-repository-edit]");
+    if (editButton) {
+      editGitHubRepositoryEntry(editButton.getAttribute("data-student-github-repository-edit"));
+      return;
+    }
+    var deleteButton = event.target.closest("[data-student-github-repository-delete]");
+    if (deleteButton) {
+      deleteGitHubRepositoryEntry(deleteButton.getAttribute("data-student-github-repository-delete"));
+    }
+  });
 
   var studentSkillEvidenceSkill = document.getElementById("student-skill-evidence-skill");
   if (studentSkillEvidenceSkill) {
@@ -4190,9 +4523,26 @@
         }).join("") + '</ul></div>');
     }
     var profileLinks = [];
-    if (isHttpUrl(candidate.githubUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.githubUrl) + '" target="_blank" rel="noopener noreferrer">GitHub profile link provided</a>');
+    if (isGitHubProfileUrl(candidate.githubUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.githubUrl) + '" target="_blank" rel="noopener noreferrer">GitHub profile link provided</a>');
     if (isHttpUrl(candidate.portfolioUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.portfolioUrl) + '" target="_blank" rel="noopener noreferrer">Portfolio link provided</a>');
     if (profileLinks.length) details.push('<p>' + profileLinks.join(" · ") + '</p>');
+    if (candidate.githubRepositories.length) {
+      details.push('<div><strong>Public GitHub repositories:</strong><ul class="recruiter-candidate__projects">' +
+        candidate.githubRepositories.map(function (repo) {
+          var projectName = repo.projectId && candidate.projects.find(function (project) { return project.id === repo.projectId; });
+          var skillNames = repo.skillIds && repo.skillIds.length ? repo.skillIds.map(function (skillId) {
+            var matched = candidate.skills.find(function (skill) { return skill.id === skillId; });
+            return matched ? matched.name : "";
+          }).filter(Boolean) : [];
+          return '<li><strong><a href="' + escapeHtml(repo.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(repo.name || repo.fullName) + '</a></strong>' +
+            (repo.description ? '<p>' + escapeHtml(repo.description) + '</p>' : '') +
+            (repo.language ? '<p>Language: ' + escapeHtml(repo.language) + '</p>' : '') +
+            (repo.topics && repo.topics.length ? '<p>Topics: ' + escapeHtml(repo.topics.join(", ")) + '</p>' : '') +
+            (projectName ? '<p>Associated project: ' + escapeHtml(projectName.title) + '</p>' : '') +
+            (skillNames.length ? '<p>Associated skill: ' + escapeHtml(skillNames.join(", ")) + '</p>' : '') +
+            '</li>';
+        }).join("") + '</ul></div>');
+    }
     var sharedSessions = candidate.defenseSessions.filter(function (session) {
       return session.status === "completed" && session.shareWithRecruiters;
     });
