@@ -658,7 +658,19 @@
   var studentApplicationListMessage = document.getElementById("student-application-list-message");
   var studentApplicationDuplicateEdit = document.getElementById("student-application-duplicate-edit");
   var studentApplicationDraftId = null;
-  var studentApplicationStatuses = ["Applied", "Viewed", "In Review", "Shortlisted", "Rejected", "Closed"];
+  var studentApplicationStatuses = ["Applied", "Under Review", "Shortlisted", "Interview Scheduled", "Rejected", "Hired"];
+  var studentApplicationLegacyStatuses = ["Viewed", "In Review", "Closed"];
+  var studentApplicationStatusTransitions = {
+    "Applied": ["Under Review", "Shortlisted", "Interview Scheduled", "Rejected"],
+    "Under Review": ["Shortlisted", "Interview Scheduled", "Rejected", "Hired"],
+    "Shortlisted": ["Interview Scheduled", "Rejected", "Hired"],
+    "Interview Scheduled": ["Rejected", "Hired", "Under Review"],
+    "Rejected": [],
+    "Hired": [],
+    "Viewed": ["Under Review", "Shortlisted", "Interview Scheduled", "Rejected", "Hired"],
+    "In Review": ["Shortlisted", "Interview Scheduled", "Rejected", "Hired"],
+    "Closed": []
+  };
   var studentOverview = document.getElementById("student-profile-overview");
   var studentSkillDraftId = null;
   var studentProjectDraftId = null;
@@ -741,6 +753,106 @@
     };
   }
 
+  function normalizeApplicationStatus(value) {
+    var status = String(value || "").trim();
+    if (!status) return "";
+    var normalized = {
+      Viewed: "Under Review",
+      "In Review": "Under Review",
+      "Interview scheduled": "Interview Scheduled",
+      "Interview Scheduled": "Interview Scheduled",
+      "Under Review": "Under Review",
+      Applied: "Applied",
+      Shortlisted: "Shortlisted",
+      Rejected: "Rejected",
+      Hired: "Hired",
+      Closed: "Closed"
+    }[status] || status;
+    return normalized;
+  }
+
+  function getApplicationStatusLabel(value) {
+    var status = normalizeApplicationStatus(value);
+    return status || "Unknown";
+  }
+
+  function getApplicationStatusClass(value) {
+    var status = normalizeApplicationStatus(value);
+    return {
+      Applied: "student-application-status--applied",
+      "Under Review": "student-application-status--under-review",
+      Shortlisted: "student-application-status--shortlisted",
+      "Interview Scheduled": "student-application-status--interview",
+      Rejected: "student-application-status--rejected",
+      Hired: "student-application-status--hired",
+      Closed: "student-application-status--closed",
+      "Viewed": "student-application-status--under-review",
+      "In Review": "student-application-status--under-review"
+    }[status] || "student-application-status--applied";
+  }
+
+  function normalizeApplicationStatusHistory(value, fallbackApplicationId, fallbackStatus) {
+    var raw = Array.isArray(value) ? value : [];
+    var normalized = raw.map(function (entry, index) {
+      var item = entry && typeof entry === "object" ? entry : {};
+      return {
+        id: String(item.id || "status_" + (fallbackApplicationId || "legacy_") + "_" + index),
+        applicationId: String(item.applicationId || fallbackApplicationId || "").trim(),
+        previousStatus: normalizeApplicationStatus(item.previousStatus || ""),
+        newStatus: normalizeApplicationStatus(item.newStatus || fallbackStatus || ""),
+        timestamp: String(item.timestamp || "").trim(),
+        actor: String(item.actor || "").trim(),
+        actorRole: String(item.actorRole || "").trim(),
+        note: String(item.note || "").trim()
+      };
+    }).filter(function (entry) { return !!entry.newStatus; });
+    if (!normalized.length && fallbackStatus) {
+      normalized.push({
+        id: "status_init_" + (fallbackApplicationId || "legacy_") + "_" + Date.now(),
+        applicationId: String(fallbackApplicationId || "").trim(),
+        previousStatus: "",
+        newStatus: normalizeApplicationStatus(fallbackStatus),
+        timestamp: new Date().toISOString(),
+        actor: "Applicant",
+        actorRole: "Applicant",
+        note: "Application recorded in the browser-local tracker."
+      });
+    }
+    return normalized.slice(-25);
+  }
+
+  function appendApplicationStatusHistory(application, previousStatus, newStatus, actor, actorRole, note, timestamp) {
+    if (!application || !newStatus) return Array.isArray(application && application.statusHistory) ? application.statusHistory : [];
+    var history = Array.isArray(application.statusHistory) ? application.statusHistory.slice() : [];
+    var entry = {
+      id: "status_" + (application.id || "application") + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      applicationId: String(application.id || "").trim(),
+      previousStatus: normalizeApplicationStatus(previousStatus || ""),
+      newStatus: normalizeApplicationStatus(newStatus),
+      timestamp: timestamp || new Date().toISOString(),
+      actor: String(actor || "").trim() || "Demo user",
+      actorRole: String(actorRole || "").trim() || "Recruiter",
+      note: String(note || "").trim()
+    };
+    if (!entry.previousStatus && application.status) entry.previousStatus = normalizeApplicationStatus(application.status);
+    if (!entry.newStatus) entry.newStatus = normalizeApplicationStatus(application.status) || "Applied";
+    var lastEntry = history.length ? history[history.length - 1] : null;
+    if (lastEntry && lastEntry.newStatus === entry.newStatus && lastEntry.previousStatus === entry.previousStatus && lastEntry.timestamp === entry.timestamp && lastEntry.actor === entry.actor) {
+      return history;
+    }
+    history.push(entry);
+    application.statusHistory = history.slice(-25);
+    return application.statusHistory;
+  }
+
+  function canTransitionApplicationStatus(currentStatus, nextStatus) {
+    var current = normalizeApplicationStatus(currentStatus);
+    var next = normalizeApplicationStatus(nextStatus);
+    if (!current || !next || current === next) return false;
+    var options = studentApplicationStatusTransitions[current] || [];
+    return options.indexOf(next) !== -1;
+  }
+
   function normalizeStudentProfile(profile) {
     var source = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {};
     var skills = Array.isArray(source.skills) ? source.skills.map(function (skill, index) {
@@ -771,7 +883,21 @@
 
     var applications = Array.isArray(source.applications) ? source.applications.map(function (application, index) {
       var item = application && typeof application === "object" && !Array.isArray(application) ? application : {};
-      var status = String(item.status || "").trim();
+      var status = normalizeApplicationStatus(String(item.status || "").trim());
+      var recruiterStatus = normalizeApplicationStatus(String(item.recruiterStatus || "").trim());
+      var history = normalizeApplicationStatusHistory(Array.isArray(item.statusHistory) ? item.statusHistory : [], String(item.id || "application_legacy_" + index), status || recruiterStatus || "Applied");
+      if (!history.length && (status || recruiterStatus)) {
+        history = [{
+          id: "status_init_" + (item.id || "application_legacy_" + index),
+          applicationId: String(item.id || "application_legacy_" + index).trim(),
+          previousStatus: "",
+          newStatus: status || recruiterStatus,
+          timestamp: String(item.recruiterUpdatedAt || item.updatedAt || item.applicationDate || new Date().toISOString()).trim(),
+          actor: recruiterStatus ? "Recruiter" : "Applicant",
+          actorRole: recruiterStatus ? "Recruiter" : "Applicant",
+          note: recruiterStatus ? "Recruiter status updated in the local demo." : "Application recorded in the browser-local tracker."
+        }];
+      }
       return {
         id: String(item.id || "application_legacy_" + index),
         jobId: item.jobId === null || item.jobId === undefined ? "" : String(item.jobId).trim(),
@@ -781,16 +907,17 @@
         companyName: String(item.companyName || "").trim(),
         applicationDate: String(item.applicationDate || "").trim(),
         methodSource: String(item.methodSource || "").trim(),
-        status: status,
-        recruiterStatus: studentApplicationStatuses.indexOf(String(item.recruiterStatus || "")) !== -1 ? String(item.recruiterStatus) : "",
+        status: status || recruiterStatus || "Applied",
+        recruiterStatus: recruiterStatus || (status && status !== "Applied" ? status : ""),
         recruiterUpdatedAt: String(item.recruiterUpdatedAt || "").trim(),
         notes: String(item.notes || "").trim(),
         createdAt: String(item.createdAt || "").trim(),
         updatedAt: String(item.updatedAt || "").trim(),
+        statusHistory: history,
         statusSource: "student"
       };
     }).filter(function (application) {
-      return !!(application.jobTitle && application.companyName && studentApplicationStatuses.indexOf(application.status) !== -1);
+      return !!(application.jobTitle && application.companyName && (studentApplicationStatuses.indexOf(application.status) !== -1 || studentApplicationLegacyStatuses.indexOf(application.status) !== -1));
     }) : [];
 
     return {
@@ -1287,6 +1414,25 @@
     };
   }
 
+  function skillGapPartialMatch(requiredSkill, skills) {
+    if (!requiredSkill || !Array.isArray(skills) || !skills.length) return null;
+    var requirement = String(requiredSkill || "").trim();
+    if (!requirement) return null;
+    var requirementKey = requirement.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    var requirementTokens = requirementKey ? requirementKey.split(" ").filter(function (token) { return token.length >= 3; }) : [];
+    return skills.find(function (skill) {
+      var name = String(skill && skill.name ? skill.name : "").trim();
+      if (!name) return false;
+      var nameKey = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+      if (!nameKey || requirementKey === nameKey) return false;
+      var nameTokens = nameKey.split(" ").filter(function (token) { return token.length >= 3; });
+      if (!nameTokens.length || !requirementTokens.length) return false;
+      return requirementTokens.some(function (token) { return nameTokens.indexOf(token) !== -1; }) ||
+        requirementKey.indexOf(nameKey) !== -1 ||
+        nameKey.indexOf(requirementKey) !== -1;
+    }) || null;
+  }
+
   function roadmapExerciseForSkill(skillName, profile) {
     var skillLower = skillName.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     var skillPattern = new RegExp("(^|[^a-z0-9])" + skillLower + "($|[^a-z0-9])", "i");
@@ -1423,16 +1569,25 @@
     });
     var matching = [];
     var missing = [];
+    var partial = [];
     var projectEvidence = [];
     var moreEvidence = [];
     requiredSkills.forEach(function (required) {
       var skill = skillByName[required.toLowerCase().replace(/\s+/g, " ")];
-      if (!skill) { missing.push(required); return; }
-      var evidence = skillGapEvidenceForSkill(skill, sourceProfile);
-      var row = { requirement: required, skill: skill, evidence: evidence };
-      matching.push(row);
-      if (evidence.kind === "project-linked") projectEvidence.push(row);
-      else moreEvidence.push(row);
+      if (skill) {
+        var evidence = skillGapEvidenceForSkill(skill, sourceProfile);
+        var row = { requirement: required, skill: skill, evidence: evidence };
+        matching.push(row);
+        if (evidence.kind === "project-linked") projectEvidence.push(row);
+        else moreEvidence.push(row);
+        return;
+      }
+      var partialSkill = skillGapPartialMatch(required, sourceProfile.skills);
+      if (partialSkill) {
+        partial.push({ requirement: required, skill: partialSkill, evidence: skillGapEvidenceForSkill(partialSkill, sourceProfile) });
+        return;
+      }
+      missing.push(required);
     });
     var denominator = requiredSkills.length;
     var readiness = denominator ? Math.round((matching.length / denominator) * 100) : null;
@@ -1444,10 +1599,10 @@
     document.getElementById("skill-gap-results").hidden = false;
     document.getElementById("skill-gap-summary-title").textContent = (analysis.mode === "job" ? "Job-specific analysis: " : "Generic role analysis: ") + (targetName || "Target role");
     document.getElementById("skill-gap-readiness").textContent = readiness === null
-      ? "Readiness percentage: not available"
-      : "Name-match coverage: " + readiness + "%";
+      ? "Indicative skills-match score: not available"
+      : "Indicative skills-match score: " + readiness + "%";
     document.getElementById("skill-gap-readiness-method").textContent = denominator
-      ? "Formula: exact case-insensitive skill-name matches ÷ " + denominator + " unique target skills × 100 = " + matching.length + " ÷ " + denominator + " × 100. Self-declared and project-linked matches count equally. This is not a measure or guarantee of employability."
+      ? "Formula: exact case-insensitive skill-name matches ÷ " + denominator + " unique target skills × 100 = " + matching.length + " ÷ " + denominator + " × 100. Partial matches are shown separately and are not added to the score. This is an indicative skills-match score, not a guarantee of employability."
       : "No percentage is shown because the target listing has no recorded skill list.";
     document.getElementById("skill-gap-incomplete").textContent = incomplete.length
       ? "Incomplete comparison: " + incomplete.join("; ") + "."
@@ -1468,6 +1623,7 @@
       }).join("");
     }
     document.getElementById("skill-gap-matching").innerHTML = renderSkillRows(matching, "No target skills match saved skill names.", true);
+    document.getElementById("skill-gap-partial").innerHTML = renderSkillRows(partial, "No partially matched skills were detected with the available profile data.", true);
     document.getElementById("skill-gap-missing").innerHTML = renderSkillRows(missing.map(function (skill) { return { requirement: skill }; }), "No missing target skills by name.", false);
     document.getElementById("skill-gap-evidence").innerHTML = renderSkillRows(projectEvidence, "No matched target skills are currently project-linked.", true);
     document.getElementById("skill-gap-more-evidence").innerHTML = renderSkillRows(moreEvidence, "No matched skills are currently classified as self-declared.", true);
@@ -1745,15 +1901,45 @@
     return date.toLocaleDateString();
   }
 
+  function renderApplicationStatusTimeline(application) {
+    var history = Array.isArray(application.statusHistory) && application.statusHistory.length
+      ? application.statusHistory.slice().reverse()
+      : [{
+          previousStatus: "",
+          newStatus: getApplicationStatusLabel(application.status),
+          timestamp: application.updatedAt || application.applicationDate || new Date().toISOString(),
+          actor: application.statusSource === "recruiter" ? "Recruiter" : "Applicant",
+          actorRole: application.statusSource === "recruiter" ? "Recruiter" : "Applicant",
+          note: application.statusSource === "recruiter" ? "Status updated in the browser-local recruiter demo." : "Application recorded in this browser."
+        }];
+    return '<details class="application-status-timeline"><summary>Status timeline</summary><ul class="application-status-timeline__list">' +
+      history.map(function (entry) {
+        var previous = entry.previousStatus ? escapeHtml(getApplicationStatusLabel(entry.previousStatus)) : "—";
+        var next = escapeHtml(getApplicationStatusLabel(entry.newStatus || application.status));
+        var actor = entry.actor ? escapeHtml(entry.actor) : "Unknown";
+        var role = entry.actorRole ? " · " + escapeHtml(entry.actorRole) : "";
+        var timestamp = entry.timestamp ? escapeHtml(formatStudentApplicationDate(entry.timestamp.slice(0, 10))) : "Time unavailable";
+        var note = entry.note ? '<p>' + escapeHtml(entry.note) + '</p>' : "";
+        return '<li><strong>' + previous + ' → ' + next + '</strong><span>' + timestamp + ' · ' + actor + role + '</span>' + note + '</li>';
+      }).join("") + '</ul></details>';
+  }
+
   function studentApplicationItemHtml(application, compact) {
+    var statusValue = application.recruiterStatus || application.status || "Applied";
+    var statusLabel = getApplicationStatusLabel(statusValue);
+    var statusClass = getApplicationStatusClass(statusValue);
+    var statusMeta = application.recruiterStatus && application.recruiterStatus !== application.status
+      ? 'Current status: ' + escapeHtml(statusLabel) + ' · recruiter update: ' + escapeHtml(getApplicationStatusLabel(application.recruiterStatus)) + ' · local only'
+      : 'Current status: ' + escapeHtml(statusLabel) + ' · local demo tracker';
     return '<li class="student-application-item">' +
       '<div class="student-application-item__content">' +
-        '<div class="student-application-item__heading"><strong>' + escapeHtml(application.jobTitle) + '</strong><span class="student-application-status">' + escapeHtml(application.status) + '</span></div>' +
+        '<div class="student-application-item__heading"><strong>' + escapeHtml(application.jobTitle) + '</strong><span class="student-application-status ' + statusClass + '">' + escapeHtml(statusLabel) + '</span></div>' +
         '<span class="student-item__meta">' + escapeHtml(application.companyName) + ' · ' + escapeHtml(formatStudentApplicationDate(application.applicationDate)) + '</span>' +
         '<span class="student-item__meta">Method/source: ' + escapeHtml(application.methodSource || "Not provided") + '</span>' +
-        '<span class="student-item__meta">Your status: entered by you · not synced with an employer</span>' +
-        (application.recruiterStatus ? '<span class="student-item__meta">Recruiter demo status: ' + escapeHtml(application.recruiterStatus) + (application.recruiterUpdatedAt ? ' · updated ' + escapeHtml(formatStudentApplicationDate(application.recruiterUpdatedAt.slice(0, 10))) : '') + ' · local only</span>' : '') +
+        '<span class="student-item__meta">' + statusMeta + '</span>' +
+        (application.recruiterStatus ? '<span class="student-item__meta">Recruiter demo status: ' + escapeHtml(getApplicationStatusLabel(application.recruiterStatus)) + (application.recruiterUpdatedAt ? ' · updated ' + escapeHtml(formatStudentApplicationDate(application.recruiterUpdatedAt.slice(0, 10))) : '') + ' · local only</span>' : '') +
         (application.notes ? '<p class="student-application-item__notes">' + escapeHtml(application.notes) + '</p>' : '') +
+        renderApplicationStatusTimeline(application) +
       '</div>' +
       '<div class="student-application-item__actions">' +
         '<button class="btn btn--text" type="button" data-student-application-edit="' + escapeHtml(application.id) + '">Edit</button>' +
@@ -3568,7 +3754,7 @@
     return '<li class="recruiter-applicant">' +
       '<div class="recruiter-applicant__header">' +
         '<div><h3>' + escapeHtml(application.jobTitle) + '</h3><p class="recruiter-listing__company">' + escapeHtml(listing.company) + '</p></div>' +
-        '<span class="student-application-status">' + escapeHtml(effectiveStatus) + '</span>' +
+        '<span class="student-application-status">' + escapeHtml(getApplicationStatusLabel(effectiveStatus)) + '</span>' +
       '</div>' +
       '<p class="recruiter-listing__meta"><strong>Applied:</strong> ' + escapeHtml(formatStudentApplicationDate(application.applicationDate)) +
         ' · <strong>Candidate:</strong> ' + escapeHtml(normalizeStudentProfile(profile).fullName || 'Name not provided') + '</p>' +
@@ -3577,9 +3763,11 @@
         '<div class="field-group"><label for="recruiter-app-status-' + escapeHtml(application.id) + '">Recruiter demo status</label>' +
           '<select class="select" id="recruiter-app-status-' + escapeHtml(application.id) + '" data-recruiter-app-status="' + escapeHtml(application.id) + '">' +
             studentApplicationStatuses.map(function (status) {
-              return '<option value="' + escapeHtml(status) + '"' + (status === effectiveStatus ? ' selected' : '') + '>' + escapeHtml(status) + '</option>';
+              return '<option value="' + escapeHtml(status) + '"' + (status === getApplicationStatusLabel(effectiveStatus) ? ' selected' : '') + '>' + escapeHtml(status) + '</option>';
             }).join("") +
           '</select></div>' +
+        '<div class="field-group"><label for="recruiter-app-note-' + escapeHtml(application.id) + '">Recruiter note</label>' +
+          '<textarea class="input recruiter-app-note" id="recruiter-app-note-' + escapeHtml(application.id) + '" data-recruiter-app-note="' + escapeHtml(application.id) + '" rows="2" placeholder="Add a brief audit note"></textarea></div>' +
         '<button class="btn btn--secondary" type="button" data-recruiter-app-save="' + escapeHtml(application.id) + '">Save status</button>' +
         '<button class="btn btn--text" type="button" data-recruiter-candidate-details aria-expanded="false">Candidate details</button>' +
       '</div>' +
@@ -3651,7 +3839,11 @@
     var selector = Array.prototype.filter.call(document.querySelectorAll("[data-recruiter-app-status]"), function (item) {
       return item.dataset.recruiterAppStatus === applicationId;
     })[0];
+    var noteSelector = Array.prototype.filter.call(document.querySelectorAll("[data-recruiter-app-note]"), function (item) {
+      return item.dataset.recruiterAppNote === applicationId;
+    })[0];
     var nextStatus = selector ? selector.value : "";
+    var recruiterNote = noteSelector ? noteSelector.value.trim() : "";
     if (studentApplicationStatuses.indexOf(nextStatus) === -1) return;
     var listings = getCurrentRecruiterListings();
     var source = readRecruiterApplicantProfile();
@@ -3668,7 +3860,7 @@
       return;
     }
     var currentStatus = row.application.recruiterStatus || row.application.status;
-    if (currentStatus === nextStatus) {
+    if (normalizeApplicationStatus(currentStatus) === normalizeApplicationStatus(nextStatus)) {
       var unchangedMessage = document.getElementById("recruiter-applicant-message");
       if (unchangedMessage) unchangedMessage.textContent = "Status is unchanged; no new activity was recorded.";
       return;
@@ -3681,8 +3873,10 @@
     var normalized = normalizeStudentProfile(source.profile);
     normalized.applications = normalized.applications.map(function (application) {
       if (application.id !== applicationId) return application;
+      var previousStatus = application.recruiterStatus || application.status;
       application.recruiterStatus = nextStatus;
       application.recruiterUpdatedAt = updatedAt;
+      application.statusHistory = appendApplicationStatusHistory(application, previousStatus, nextStatus, "Recruiter", "Recruiter", recruiterNote || "Recruiter status updated in the browser-local demo.", updatedAt);
       return application;
     });
     normalized.applications.forEach(function (application) {
