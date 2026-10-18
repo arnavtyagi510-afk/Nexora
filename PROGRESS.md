@@ -1,5 +1,29 @@
 # NEXORA — Progress
 
+## Phase 3, Step 3.3 — Recruiter Applicant Management — STATUS: COMPLETE (single-browser demo scope)
+
+### Features implemented
+- Added Applicants navigation, actual associated-application counts, listing/status filters, candidate/job search, a safe applicant empty state, and candidate detail expansion.
+- Student tracker records explicitly selected for a recruiter listing preserve stable job and recruiter listing IDs. A local profile ID and candidate ID are recorded for newly linked tracker applications where absent.
+- Recruiter status updates use separate `recruiterStatus` and `recruiterUpdatedAt` fields. Student-entered status stays intact; no status changes just from viewing the Applicants page, and no notification is claimed.
+- Candidate details expose only provided name, headline, education, skills, projects and validated HTTP(S) profile/project links. Private account data and tracker notes are not displayed.
+- Applicant records remain within the existing demo profile and recruiter listing storage; no new store or backend was added. External Apply Now does not create tracker records.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated-browser checks — PASS: empty state; tracker application linked to a recruiter listing using stable IDs; only associated jobs shown; candidate profile details and safe links; status update/timestamp persistence; student/recruiter status distinction; job/status/search filters; external Apply Now creates no record; deleted listing and malformed profile handling; and no horizontal overflow at 390px.
+- Student application editing preserved recruiter status, timestamp, candidate ID and listing ID. Profile, skills, projects and saved listings were kept intact during test operations; temporary browser fixtures were restored.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parsing / duplicate-ID check — PASS.
+- `python tests\regression_test.py` could not start because Python Playwright is unavailable (`ModuleNotFoundError`).
+
+### Known limitations
+- Applicants are visible only in this browser's one local demo profile and saved recruiter listing store. Different users/browsers/devices cannot share applications without a backend.
+- Recruiter status is a browser-local demo update, not an employer response; no notification is sent. Skills, identity, and project links are not verified.
+- No cross-browser, physical-device, keyboard-only or screen-reader testing was performed.
+
 ## Phase 3, Step 3.2 — Recruiter Job Publishing & Management — STATUS: COMPLETE (browser-local demo scope)
 
 ### Features implemented

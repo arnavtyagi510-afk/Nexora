@@ -1063,6 +1063,7 @@
           return '<dt>' + escapeHtml(entry[0]) + '</dt><dd>' + escapeHtml(entry[1]) + '</dd>';
         }).join("") + '</dl>';
     }
+    renderRecruiterApplicants(readRecruiterListings());
   }
 
   function loadStudentProfileIntoForm() {
@@ -1275,6 +1276,9 @@
       record.createdAt = record.updatedAt;
       normalized.applications.push(record);
     }
+    normalized.applications.forEach(function (application) {
+      if (!application.candidateId) application.candidateId = profile.profileId;
+    });
     profile.applications = normalized.applications;
     profile.updatedAt = record.updatedAt;
     if (!writeDemoProfile(profile)) {
@@ -1581,6 +1585,7 @@
 
   /* ---------- Recruiter portal (browser-local demo only) ---------- */
   var RECRUITER_LISTINGS_KEY = "nexora:demo-recruiter-listings";
+  var RECRUITER_REVIEW_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
   var recruiterForm = document.getElementById("recruiter-listing-form");
   var recruiterFormStatus = document.getElementById("recruiter-form-status");
   var recruiterListingDraftId = null;
@@ -1601,7 +1606,7 @@
     if (!Array.isArray(value)) return null;
     var normalized = value.map(function (listing) {
       var item = listing && typeof listing === "object" ? listing : {};
-      var status = ["Draft", "Published", "Closed", "Unpublished"].indexOf(item.status) >= 0 ? item.status : "Draft";
+      var status = ["Draft", "Published", "Closed", "Unpublished", "Expired"].indexOf(item.status) >= 0 ? item.status : "Draft";
       var skills = Array.isArray(item.requiredSkills) ? item.requiredSkills : String(item.requiredSkills || "").split(",");
       var applyUrl = String(item.applyUrl || "").trim();
       if (applyUrl) {
@@ -1630,7 +1635,14 @@
         applyUrl: applyUrl,
         status: status,
         createdAt: String(item.createdAt || item.updatedAt || ""),
-        updatedAt: String(item.updatedAt || item.createdAt || "")
+        updatedAt: String(item.updatedAt || item.createdAt || ""),
+        publishedAt: String(item.publishedAt || (status === "Published" ? item.updatedAt || item.createdAt || "" : "")),
+        lastRecruiterActivityAt: String(item.lastRecruiterActivityAt || (status === "Published" ? item.publishedAt || item.updatedAt || item.createdAt || "" : "")),
+        activityEvents: Array.isArray(item.activityEvents) ? item.activityEvents.map(function (event) {
+          var entry = event && typeof event === "object" ? event : {};
+          var type = ["published", "reconfirmed", "application_reviewed", "applicant_status_changed", "closed", "unpublished", "review_required"].indexOf(entry.type) >= 0 ? entry.type : "";
+          return { type: type, timestamp: String(entry.timestamp || ""), applicationId: String(entry.applicationId || "") };
+        }).filter(function (event) { return !!(event.type && event.timestamp); }).slice(-100) : []
       };
     }).filter(function (listing) { return !!(listing.id && listing.title); });
     var seenIds = {};
@@ -1701,7 +1713,7 @@
   }
 
   function getPublishedRecruiterJobs(baseJobs) {
-    var listings = readRecruiterListings();
+    var listings = getCurrentRecruiterListings();
     if (!listings) return [];
     var ids = recruiterJobIds(listings, baseJobs);
     return listings.filter(function (listing) { return listing.status === "Published"; })
@@ -1710,7 +1722,7 @@
 
   function cleanSavedJobIds(raw, jobs) {
     var cleaned = Jobs.cleanSavedIds(raw, jobs);
-    var listings = readRecruiterListings();
+    var listings = getCurrentRecruiterListings();
     if (!Array.isArray(raw) || !listings) return cleaned;
     var recruiterIds = recruiterJobIds(listings, baseJobs);
     var knownIds = {};
@@ -1743,6 +1755,87 @@
       setRecruiterStatus("Recruiter listings could not be saved in this browser. Check browser storage and try again.");
       return false;
     }
+
+    function validRecruiterTimestamp(value) {
+      if (typeof value !== "string" || !value.trim()) return false;
+      var time = Date.parse(value);
+      return isFinite(time) && time > 0;
+    }
+
+    function addRecruiterActivity(listing, type, timestamp, applicationId) {
+      listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
+      var event = { type: type, timestamp: timestamp };
+      if (applicationId) event.applicationId = applicationId;
+      listing.activityEvents.push(event);
+      listing.activityEvents = listing.activityEvents.slice(-100);
+      listing.lastRecruiterActivityAt = timestamp;
+    }
+
+    function applyRecruiterReviewPolicy(listings, now) {
+      var changed = false;
+      var checkedAt = now || new Date();
+      listings.forEach(function (listing) {
+        if (listing.status !== "Published") return;
+        var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
+        var expired = !validRecruiterTimestamp(activityAt) || checkedAt.getTime() - Date.parse(activityAt) >= RECRUITER_REVIEW_WINDOW_MS;
+        if (!expired) return;
+        listing.status = "Expired";
+        listing.updatedAt = checkedAt.toISOString();
+        listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
+        listing.activityEvents.push({ type: "review_required", timestamp: checkedAt.toISOString() });
+        listing.activityEvents = listing.activityEvents.slice(-100);
+        changed = true;
+      });
+      return changed;
+    }
+
+    function getCurrentRecruiterListings() {
+      var listings = readRecruiterListings();
+      if (!listings) return null;
+      if (applyRecruiterReviewPolicy(listings) && !writeRecruiterListings(listings)) return null;
+      return listings;
+    }
+
+    function recruiterReviewDeadline(listing) {
+      var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
+      if (!validRecruiterTimestamp(activityAt)) return null;
+      return Date.parse(activityAt) + RECRUITER_REVIEW_WINDOW_MS;
+    }
+
+    function recruiterReviewSummary(listing, now) {
+      var deadline = recruiterReviewDeadline(listing);
+      if (listing.status === "Expired") return { text: "Needs review · expired from active opportunities", urgent: true };
+      if (listing.status !== "Published") return { text: "Review window is not active for this status.", urgent: false };
+      if (deadline === null) return { text: "Needs review · activity date unavailable", urgent: true };
+      var remaining = deadline - (now || Date.now());
+      if (remaining <= 0) return { text: "Needs review now · 15-day activity window reached", urgent: true };
+      var days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+      return { text: "Review due " + formatRecruiterDate(new Date(deadline).toISOString()) + " · " + days + (days === 1 ? " day remaining" : " days remaining"), urgent: days <= 3 };
+    }
+
+    function recruiterActivityLabel(type) {
+      return {
+        published: "Published",
+        reconfirmed: "Vacancy reconfirmed",
+        application_reviewed: "Application reviewed",
+        applicant_status_changed: "Applicant status changed",
+        closed: "Job closed",
+        unpublished: "Job unpublished",
+        review_required: "15-day review required"
+      }[type] || "Recruiter activity";
+    }
+
+    function recordRecruiterListingActivity(listings, listingId, type, applicationId, timestamp) {
+      var at = timestamp || new Date().toISOString();
+      var found = false;
+      listings.forEach(function (listing) {
+        if (listing.id !== listingId) return;
+        found = true;
+        addRecruiterActivity(listing, type, at, applicationId);
+        if (listing.status === "Published") listing.updatedAt = at;
+      });
+      return found;
+    }
   }
 
   function formatRecruiterDate(value) {
@@ -1752,19 +1845,28 @@
 
   function recruiterListingMarkup(listing) {
     var statusClass = listing.status.toLowerCase();
+    var displayStatus = listing.status === "Expired" ? "Needs Review" : listing.status;
+    var review = recruiterReviewSummary(listing);
     var actions = '<button class="btn btn--secondary" type="button" data-recruiter-edit="' + escapeHtml(listing.id) + '">Edit</button>' +
       '<button class="btn btn--text" type="button" data-recruiter-preview="' + escapeHtml(listing.id) + '">Preview</button>';
-    if (listing.status !== "Published") actions += '<button class="btn btn--secondary" type="button" data-recruiter-status="' + escapeHtml(listing.id) + '" data-next-status="Published">' + (listing.status === "Closed" ? "Reopen &amp; publish" : "Publish") + '</button>';
+    if (listing.status === "Expired" || listing.status === "Published") actions += '<button class="btn btn--primary" type="button" data-recruiter-reconfirm="' + escapeHtml(listing.id) + '">Reconfirm Vacancy</button>';
+    else if (listing.status !== "Published") actions += '<button class="btn btn--secondary" type="button" data-recruiter-status="' + escapeHtml(listing.id) + '" data-next-status="Published">' + (listing.status === "Closed" ? "Reopen &amp; publish" : "Publish") + '</button>';
     if (listing.status === "Published") actions += '<button class="btn btn--text" type="button" data-recruiter-status="' + escapeHtml(listing.id) + '" data-next-status="Unpublished">Unpublish</button>';
     if (listing.status !== "Closed") actions += '<button class="btn btn--text" type="button" data-recruiter-status="' + escapeHtml(listing.id) + '" data-next-status="Closed">Close</button>';
     actions += '<button class="btn btn--text recruiter-delete" type="button" data-recruiter-delete="' + escapeHtml(listing.id) + '">Delete</button>';
     return '<li class="recruiter-listing">' +
       '<div class="recruiter-listing__content">' +
-        '<div class="recruiter-listing__heading"><h3>' + escapeHtml(listing.title) + '</h3><span class="recruiter-status recruiter-status--' + statusClass + '">' + escapeHtml(listing.status) + '</span></div>' +
+        '<div class="recruiter-listing__heading"><h3>' + escapeHtml(listing.title) + '</h3><span class="recruiter-status recruiter-status--' + statusClass + '">' + escapeHtml(displayStatus) + '</span></div>' +
         '<p class="recruiter-listing__company">' + escapeHtml(listing.company) + '</p>' +
         '<p class="recruiter-listing__meta">' + escapeHtml(listing.location) + ' · ' + escapeHtml(listing.workMode) + ' · ' + escapeHtml(listing.jobType) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Required skills:</strong> ' + escapeHtml(listing.requiredSkills.join(", ")) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Created:</strong> ' + escapeHtml(formatRecruiterDate(listing.createdAt)) + ' · <strong>Updated:</strong> ' + escapeHtml(formatRecruiterDate(listing.updatedAt)) + '</p>' +
+        '<p class="recruiter-review ' + (review.urgent ? 'recruiter-review--urgent' : '') + '"><strong>Last recruiter activity:</strong> ' + escapeHtml(formatRecruiterDate(listing.lastRecruiterActivityAt)) + '<br><strong>15-day review:</strong> ' + escapeHtml(review.text) + '</p>' +
+        (listing.activityEvents.length ? '<details class="recruiter-activity"><summary>Activity history (' + listing.activityEvents.length + ')</summary><ul>' +
+          listing.activityEvents.slice().reverse().map(function (event) {
+            return '<li>' + escapeHtml(recruiterActivityLabel(event.type)) + ' · ' + escapeHtml(formatRecruiterDate(event.timestamp)) +
+              (event.applicationId ? ' · application ' + escapeHtml(event.applicationId) : '') + '</li>';
+          }).join("") + '</ul></details>' : '<p class="recruiter-listing__note">No audit events recorded yet.</p>') +
         (listing.status === "Published" ? '<p class="recruiter-listing__note">Local demo listing, visible only in this browser’s job explorer; not verified or shared.</p>' : '') +
       '</div>' +
       '<div class="recruiter-listing__actions">' + actions + '</div>' +
@@ -1772,7 +1874,8 @@
   }
 
   function renderRecruiterPortal() {
-    var listings = readRecruiterListings();
+    var listings = getCurrentRecruiterListings();
+    renderRecruiterApplicants(listings);
     var dashboardList = document.getElementById("recruiter-dashboard-list");
     var listingsList = document.getElementById("recruiter-listings");
     var totalCount = document.getElementById("recruiter-total-count");
@@ -1780,8 +1883,9 @@
     var draftCount = document.getElementById("recruiter-draft-count");
     var closedCount = document.getElementById("recruiter-closed-count");
     var unpublishedCount = document.getElementById("recruiter-unpublished-count");
+    var reviewCount = document.getElementById("recruiter-review-count");
     if (!listings) {
-      [totalCount, activeCount, draftCount, closedCount, unpublishedCount].forEach(function (el) { if (el) el.textContent = "—"; });
+      [totalCount, activeCount, draftCount, closedCount, unpublishedCount, reviewCount].forEach(function (el) { if (el) el.textContent = "—"; });
       [dashboardList, listingsList].forEach(function (el) {
         if (el) el.innerHTML = '<li class="empty--compact"><h3>Listings unavailable</h3><p>Browser-local data could not be read.</p></li>';
       });
@@ -1791,11 +1895,13 @@
     var drafts = listings.filter(function (listing) { return listing.status === "Draft"; }).length;
     var closed = listings.filter(function (listing) { return listing.status === "Closed"; }).length;
     var unpublished = listings.filter(function (listing) { return listing.status === "Unpublished"; }).length;
+    var needsReview = listings.filter(function (listing) { return listing.status === "Expired"; }).length;
     if (totalCount) totalCount.textContent = String(listings.length);
     if (activeCount) activeCount.textContent = String(active);
     if (draftCount) draftCount.textContent = String(drafts);
     if (closedCount) closedCount.textContent = String(closed);
     if (unpublishedCount) unpublishedCount.textContent = String(unpublished);
+    if (reviewCount) reviewCount.textContent = String(needsReview);
     var ordered = listings.slice().sort(function (a, b) { return Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0); });
     var searchValue = (document.getElementById("recruiter-listing-search") || {}).value || "";
     var filterValue = (document.getElementById("recruiter-listing-filter") || {}).value || "all";
@@ -1805,16 +1911,217 @@
     });
     if (dashboardList) dashboardList.innerHTML = ordered.length ? ordered.slice(0, 5).map(recruiterListingMarkup).join("") : '<li class="empty--compact"><h3>No job listings yet</h3><p>Create a job draft to manage a listing in this browser.</p></li>';
     if (listingsList && filtered.length) {
-      var statusOrder = ["Published", "Draft", "Unpublished", "Closed"];
+      var statusOrder = ["Published", "Expired", "Draft", "Unpublished", "Closed"];
       listingsList.innerHTML = filterValue === "all" ? statusOrder.map(function (status) {
         var group = filtered.filter(function (listing) { return listing.status === status; });
-        return group.length ? '<li class="recruiter-list-section-heading"><h3>' + status + ' <span>(' + group.length + ')</span></h3></li>' +
+        var heading = status === "Expired" ? "Needs Review" : status;
+        return group.length ? '<li class="recruiter-list-section-heading"><h3>' + heading + ' <span>(' + group.length + ')</span></h3></li>' +
           group.map(recruiterListingMarkup).join("") : "";
       }).join("") : filtered.map(recruiterListingMarkup).join("");
     } else if (listingsList) {
       listingsList.innerHTML = '<li class="empty--compact"><h3>' + (ordered.length ? "No listings match these filters" : "No job listings yet") + '</h3><p>' +
         (ordered.length ? "Try another title or status filter." : "Create a job draft to manage a listing in this browser.") + '</p></li>';
     }
+  }
+
+  function readRecruiterApplicantProfile() {
+    try {
+      var raw = window.localStorage.getItem(AUTH_PROFILE_KEY);
+      if (raw === null) return { profile: null, error: "" };
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+          (parsed.applications !== undefined && !Array.isArray(parsed.applications))) {
+        return { profile: null, error: "Applicant records are unavailable because the saved demo profile data is malformed." };
+      }
+      return { profile: parsed, error: "" };
+    } catch (error) {
+      return { profile: null, error: "Applicant records could not be read from this browser. No data was changed." };
+    }
+  }
+
+  function recruiterApplicantRows(listings, profile) {
+    if (!profile) return [];
+    var ids = recruiterJobIds(listings, baseJobs);
+    var listingById = {};
+    var listingByJobId = {};
+    listings.forEach(function (listing) {
+      listingById[listing.id] = listing;
+      listingByJobId[String(ids[listing.id])] = listing;
+    });
+    return normalizeStudentProfile(profile).applications.map(function (application) {
+      var listing = application.recruiterListingId ? listingById[application.recruiterListingId] : null;
+      if (!listing && !application.recruiterListingId && application.jobId) listing = listingByJobId[String(application.jobId)];
+      if (!listing) return null;
+      return { application: application, listing: listing };
+    }).filter(Boolean).sort(function (a, b) {
+      return (b.application.applicationDate || "").localeCompare(a.application.applicationDate || "");
+    });
+  }
+
+  function recruiterCandidateDetails(profile) {
+    var candidate = normalizeStudentProfile(profile);
+    var details = [];
+    if (candidate.headline) details.push('<p><strong>Headline:</strong> ' + escapeHtml(candidate.headline) + '</p>');
+    var education = [candidate.educationLevel, candidate.collegeName, candidate.graduationYear].filter(Boolean).join(" · ");
+    if (education) details.push('<p><strong>Education:</strong> ' + escapeHtml(education) + '</p>');
+    if (candidate.skills.length) {
+      details.push('<div><strong>Skills (self-declared):</strong><ul class="recruiter-candidate__skills">' +
+        candidate.skills.map(function (skill) {
+          return '<li>' + escapeHtml(skill.name) + (skill.level ? ' · ' + escapeHtml(skill.level) : '') + '</li>';
+        }).join("") + '</ul></div>');
+    }
+    if (candidate.projects.length) {
+      details.push('<div><strong>Projects added by student:</strong><ul class="recruiter-candidate__projects">' +
+        candidate.projects.map(function (project) {
+          var links = [];
+          if (isHttpUrl(project.githubUrl)) links.push('<a href="' + escapeHtml(project.githubUrl) + '" target="_blank" rel="noopener noreferrer">Repository link provided</a>');
+          if (isHttpUrl(project.liveDemoUrl)) links.push('<a href="' + escapeHtml(project.liveDemoUrl) + '" target="_blank" rel="noopener noreferrer">Live demo link provided</a>');
+          return '<li><strong>' + escapeHtml(project.title) + '</strong>' +
+            (project.description ? '<p>' + escapeHtml(project.description) + '</p>' : '') +
+            (project.role ? '<p>Role: ' + escapeHtml(project.role) + '</p>' : '') +
+            (project.technologies ? '<p>Technologies: ' + escapeHtml(project.technologies) + '</p>' : '') +
+            (links.length ? '<p class="recruiter-candidate__links">' + links.join(" · ") + '</p>' : '') + '</li>';
+        }).join("") + '</ul></div>');
+    }
+    var profileLinks = [];
+    if (isHttpUrl(candidate.githubUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.githubUrl) + '" target="_blank" rel="noopener noreferrer">GitHub profile link provided</a>');
+    if (isHttpUrl(candidate.portfolioUrl)) profileLinks.push('<a href="' + escapeHtml(candidate.portfolioUrl) + '" target="_blank" rel="noopener noreferrer">Portfolio link provided</a>');
+    if (profileLinks.length) details.push('<p>' + profileLinks.join(" · ") + '</p>');
+    return details.length ? details.join("") : '<p>Candidate has not provided additional profile details.</p>';
+  }
+
+  function recruiterApplicantMarkup(row, profile) {
+    var application = row.application;
+    var listing = row.listing;
+    var effectiveStatus = application.recruiterStatus || application.status;
+    var statusSource = application.recruiterStatus
+      ? 'Recruiter-updated locally' + (application.recruiterUpdatedAt ? ' · ' + escapeHtml(formatStudentApplicationDate(application.recruiterUpdatedAt.slice(0, 10))) : '')
+      : 'Student-entered; not employer-confirmed';
+    return '<li class="recruiter-applicant">' +
+      '<div class="recruiter-applicant__header">' +
+        '<div><h3>' + escapeHtml(application.jobTitle) + '</h3><p class="recruiter-listing__company">' + escapeHtml(listing.company) + '</p></div>' +
+        '<span class="student-application-status">' + escapeHtml(effectiveStatus) + '</span>' +
+      '</div>' +
+      '<p class="recruiter-listing__meta"><strong>Applied:</strong> ' + escapeHtml(formatStudentApplicationDate(application.applicationDate)) +
+        ' · <strong>Candidate:</strong> ' + escapeHtml(normalizeStudentProfile(profile).fullName || 'Name not provided') + '</p>' +
+      '<p class="recruiter-listing__note">' + statusSource + '</p>' +
+      '<div class="recruiter-applicant__controls">' +
+        '<div class="field-group"><label for="recruiter-app-status-' + escapeHtml(application.id) + '">Recruiter demo status</label>' +
+          '<select class="select" id="recruiter-app-status-' + escapeHtml(application.id) + '" data-recruiter-app-status="' + escapeHtml(application.id) + '">' +
+            studentApplicationStatuses.map(function (status) {
+              return '<option value="' + escapeHtml(status) + '"' + (status === effectiveStatus ? ' selected' : '') + '>' + escapeHtml(status) + '</option>';
+            }).join("") +
+          '</select></div>' +
+        '<button class="btn btn--secondary" type="button" data-recruiter-app-save="' + escapeHtml(application.id) + '">Save status</button>' +
+        '<button class="btn btn--text" type="button" data-recruiter-candidate-details aria-expanded="false">Candidate details</button>' +
+      '</div>' +
+      '<div class="recruiter-candidate" hidden>' + recruiterCandidateDetails(profile) + '</div>' +
+    '</li>';
+  }
+
+  function renderRecruiterApplicants(listings) {
+    var list = document.getElementById("recruiter-applicant-list");
+    var count = document.getElementById("recruiter-applicant-count");
+    var total = document.getElementById("recruiter-applicant-total");
+    var message = document.getElementById("recruiter-applicant-message");
+    var jobFilter = document.getElementById("recruiter-applicant-job-filter");
+    if (!list) return;
+    if (!Array.isArray(listings)) {
+      if (count) count.textContent = "—";
+      if (total) total.textContent = "Unavailable";
+      if (message) message.textContent = "Applicant associations are unavailable because recruiter listing data could not be read.";
+      list.innerHTML = '<li class="empty--compact"><h3>Applicant data unavailable</h3><p>Recruiter job records could not be safely read.</p></li>';
+      return;
+    }
+    var source = readRecruiterApplicantProfile();
+    if (source.error) {
+      if (count) count.textContent = "—";
+      if (total) total.textContent = "Unavailable";
+      if (message) message.textContent = source.error;
+      list.innerHTML = '<li class="empty--compact"><h3>Applicant data unavailable</h3><p>Saved profile data could not be safely read.</p></li>';
+      return;
+    }
+    if (message) message.textContent = "";
+    var profile = source.profile;
+    var rows = recruiterApplicantRows(listings, profile);
+    if (count) count.textContent = String(rows.length);
+    if (total) total.textContent = rows.length + (rows.length === 1 ? " recorded" : " recorded");
+    if (jobFilter) {
+      var selectedJob = jobFilter.value;
+      var options = '<option value="">All your listings</option>' + listings.map(function (listing) {
+        return '<option value="' + escapeHtml(listing.id) + '">' + escapeHtml(listing.title + " · " + listing.company) + '</option>';
+      }).join("");
+      if (jobFilter.innerHTML !== options) jobFilter.innerHTML = options;
+      if (selectedJob && listings.some(function (listing) { return listing.id === selectedJob; })) jobFilter.value = selectedJob;
+    }
+    if (!listings.length) {
+      list.innerHTML = '<li class="empty--compact"><h3>No recruiter listings available</h3><p>Create a listing before applications can be associated with it.</p></li>';
+      return;
+    }
+    if (!profile || !rows.length) {
+      list.innerHTML = '<li class="empty--compact"><h3>No applications recorded for your listings</h3><p>Only a student record explicitly saved in this browser and linked to one of your recruiter job IDs appears here. External Apply Now visits are not applications.</p></li>';
+      return;
+    }
+    var selectedJobId = jobFilter ? jobFilter.value : "";
+    var statusFilter = document.getElementById("recruiter-applicant-status-filter");
+    var search = document.getElementById("recruiter-applicant-search");
+    var selectedStatus = statusFilter ? statusFilter.value : "";
+    var query = search ? search.value.trim().toLowerCase() : "";
+    var filtered = rows.filter(function (row) {
+      var status = row.application.recruiterStatus || row.application.status;
+      var matchesJob = !selectedJobId || row.listing.id === selectedJobId;
+      var matchesStatus = !selectedStatus || status === selectedStatus;
+      var matchesQuery = !query || (normalizeStudentProfile(profile).fullName + " " + row.application.jobTitle).toLowerCase().indexOf(query) !== -1;
+      return matchesJob && matchesStatus && matchesQuery;
+    });
+    list.innerHTML = filtered.length
+      ? filtered.map(function (row) { return recruiterApplicantMarkup(row, profile); }).join("")
+      : '<li class="empty--compact"><h3>No matching applicants</h3><p>Try another listing, status, or search term.</p></li>';
+  }
+
+  function saveRecruiterApplicantStatus(applicationId) {
+    var selector = Array.prototype.filter.call(document.querySelectorAll("[data-recruiter-app-status]"), function (item) {
+      return item.dataset.recruiterAppStatus === applicationId;
+    })[0];
+    var nextStatus = selector ? selector.value : "";
+    if (studentApplicationStatuses.indexOf(nextStatus) === -1) return;
+    var listings = readRecruiterListings();
+    var source = readRecruiterApplicantProfile();
+    if (!listings || source.error || !source.profile) {
+      var message = document.getElementById("recruiter-applicant-message");
+      if (message) message.textContent = source.error || "Applicant profile is not available in this browser.";
+      return;
+    }
+    var row = recruiterApplicantRows(listings, source.profile).find(function (item) { return item.application.id === applicationId; });
+    if (!row) {
+      var statusMessage = document.getElementById("recruiter-applicant-message");
+      if (statusMessage) statusMessage.textContent = "This application is no longer associated with an available recruiter listing.";
+      renderRecruiterApplicants(listings);
+      return;
+    }
+    var updatedAt = new Date().toISOString();
+    if (!source.profile.profileId) source.profile.profileId = "candidate_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    var normalized = normalizeStudentProfile(source.profile);
+    normalized.applications = normalized.applications.map(function (application) {
+      if (application.id !== applicationId) return application;
+      application.recruiterStatus = nextStatus;
+      application.recruiterUpdatedAt = updatedAt;
+      return application;
+    });
+    normalized.applications.forEach(function (application) {
+      if (!application.candidateId) application.candidateId = source.profile.profileId;
+    });
+    source.profile.applications = normalized.applications;
+    if (!writeDemoProfile(source.profile)) {
+      var errorMessage = document.getElementById("recruiter-applicant-message");
+      if (errorMessage) errorMessage.textContent = "Recruiter status could not be saved in this browser.";
+      return;
+    }
+    var successMessage = document.getElementById("recruiter-applicant-message");
+    if (successMessage) successMessage.textContent = "Recruiter demo status saved locally. No notification was sent.";
+    renderRecruiterApplicants(listings);
+    renderStudentApplicationLists(source.profile);
+    renderStudentDashboard();
   }
 
   function showRecruiterRoute(route) {
@@ -1830,6 +2137,7 @@
     var viewMap = {
       dashboard: document.getElementById("recruiter-dashboard-view"),
       listings: document.getElementById("recruiter-listings-view"),
+      applications: document.getElementById("recruiter-applications-view"),
       editor: document.getElementById("recruiter-editor-view")
     };
     $$(".recruiter-view").forEach(function (view) {
@@ -2161,12 +2469,19 @@
   var listingFilter = document.getElementById("recruiter-listing-filter");
   if (listingSearch) listingSearch.addEventListener("input", renderRecruiterPortal);
   if (listingFilter) listingFilter.addEventListener("change", renderRecruiterPortal);
+  ["recruiter-applicant-search", "recruiter-applicant-job-filter", "recruiter-applicant-status-filter"].forEach(function (id) {
+    var control = document.getElementById(id);
+    if (control) control.addEventListener(control.tagName === "SELECT" ? "change" : "input", function () {
+      renderRecruiterApplicants(readRecruiterListings());
+    });
+  });
   renderRecruiterPortal();
   window.addEventListener("storage", function (event) {
     if (event.key === RECRUITER_LISTINGS_KEY) {
       renderRecruiterPortal();
       refreshPublishedJobs();
     }
+    if (event.key === AUTH_PROFILE_KEY) renderRecruiterApplicants(readRecruiterListings());
   });
 
   document.addEventListener("click", function (event) {
@@ -2200,6 +2515,20 @@
     var recruiterStatusButton = event.target.closest("[data-recruiter-status]");
     if (recruiterStatusButton) {
       transitionRecruiterListing(recruiterStatusButton.dataset.recruiterStatus, recruiterStatusButton.dataset.nextStatus);
+      return;
+    }
+    var recruiterApplicationSave = event.target.closest("[data-recruiter-app-save]");
+    if (recruiterApplicationSave) {
+      saveRecruiterApplicantStatus(recruiterApplicationSave.dataset.recruiterAppSave);
+      return;
+    }
+    var recruiterCandidateDetailsButton = event.target.closest("[data-recruiter-candidate-details]");
+    if (recruiterCandidateDetailsButton) {
+      var details = recruiterCandidateDetailsButton.closest(".recruiter-applicant").querySelector(".recruiter-candidate");
+      var expanded = recruiterCandidateDetailsButton.getAttribute("aria-expanded") === "true";
+      recruiterCandidateDetailsButton.setAttribute("aria-expanded", String(!expanded));
+      recruiterCandidateDetailsButton.textContent = expanded ? "Candidate details" : "Hide candidate details";
+      if (details) details.hidden = expanded;
       return;
     }
     var routeButton = event.target.closest("[data-student-route]");

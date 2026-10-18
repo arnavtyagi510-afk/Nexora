@@ -1,6 +1,14 @@
-# NEXORA — Phase 3, Step 3.2 (recruiter job publishing & management)
+# NEXORA — Phase 3, Step 3.3 (recruiter applicant management)
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 3.3 highlights
+
+- Recruiter **Applicants** shows only student-tracker records associated with a saved recruiter listing by stable recruiter listing/job IDs. Manually entered, unlinked records and applications to other jobs are excluded.
+- Candidate details show only profile fields the student supplied: name/headline, education, skills, projects and valid portfolio/repository links. No email, password, private account data, or application notes are exposed.
+- Recruiters can save a separate local demo status (Applied, Viewed, In Review, Shortlisted, Rejected, Closed) with a timestamp. It does not overwrite the student-entered status and sends no notification.
+- Data uses the existing `nexora:demo-profile` and `nexora:demo-recruiter-listings` records; no applicant store or backend was added.
+- This is a single-browser demo with one local student profile. It cannot receive or share applications between different users, browsers, or devices. External Apply Now does not record a submitted application.
 
 ## Phase 3.2 highlights
 
@@ -38,6 +46,8 @@ Plain **HTML + CSS + JavaScript**. There is no `package.json`, no build step, no
 ## Validation status
 
 Actual validation performed:
+- Step 3.3 integrated-browser checks covered the empty Applicants state, saving a tracker application linked to a recruiter listing by stable IDs, excluding an unlinked manual record, candidate details and safe provided links, recruiter status/timestamp persistence, recruiter-vs-student status distinction after student editing, listing/status/search filters, external Apply Now not creating a record, deleted-job and malformed-profile handling, and 390px layout.
+- Step 3.3 browser fixtures were temporary and restored after the checks.
 - Step 3.2 integrated-browser checks against the local `file://` page covered draft creation and preview, publishing into Job Explorer, recruiter-entered detail fields, edit without duplication, unpublish/close/reopen, search and status filters, sorting, persistence after reload, bookmark retention and reattachment, safe application snapshots after close/delete, delete confirmation, and recruiter mobile navigation/layout.
 - Step 3.2 validation checks rejected empty required fields, a `javascript:` application URL, and a past deadline while retaining the form values. A published listing without a URL displayed the missing-link explanation and disabled Apply Now.
 - Step 3.2 malformed recruiter storage rendered an explicit unavailable state and unknown counts rather than crashing or reporting empty success.
@@ -98,13 +108,15 @@ An internet connection is only needed for the Google Font (Plus Jakarta Sans). O
 - The dashboard profile overview shows project details and available links. Links open in a new tab with `noopener noreferrer`. “Project added by student” and “Repository link provided” are descriptive labels only; NEXORA does not verify projects, repository contents, contributions, or skills.
 - A **Reset demo profile data** button clears the locally saved onboarding data. The job explorer remains available as the guest experience, and users can return to browsing at any time without losing the search/filter state in the list.
 
-### Recruiter portal (Steps 3.1–3.2)
+### Recruiter portal (Steps 3.1–3.3)
 
 - Choose **Recruiter** in the site menu to open the separate recruiter workspace; it does not require or create an account.
 - Choose **Create Job**, enter the required fields, and use **Save as Draft**, **Preview Job**, or **Publish Job**. Published listings appear in this browser's student Job Explorer; they are not shared with other visitors.
 - Use **Edit**, **Unpublish**, **Close**, or **Reopen & publish** to manage a saved record. Search/filter the list by title, company, and status. Delete asks for confirmation.
 - Only a recruiter-supplied HTTP(S) application URL is available to students. Without one, the job details explain that no usable external application link was provided.
 - Recruiter listings are independent of student profile data. Bookmarking and applications remain local to this browser; no external submission or employer response is implied.
+- **Applicants** shows only records saved through this browser's student tracker and linked by listing/job ID. Candidate details contain only student-provided profile information. Recruiter demo statuses are separate, local-only values; no student notification is sent.
+- A local recruiter workspace cannot receive applications from another user, browser, or device. Do not use this demo to handle real applicant information.
 
 1. Open `index.html` and click **View details** on any card. The dialog shows that job's own data, a **Demo listing** badge, and plain wording that it is fictional. Use the **X**, the **Close** button, **Escape**, or a click outside to close. Your search and filters are untouched, and focus returns to the card.
 2. In the dialog click **Apply Now**. For these demo listings you get a friendly explanation that it is sample data and cannot accept an application. You stay on NEXORA and nothing is sent or saved.

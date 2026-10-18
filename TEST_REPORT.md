@@ -1,5 +1,31 @@
 # NEXORA — Test Report
 
+## Phase 3, Step 3.3 — recruiter applicant management
+
+### Integrated-browser checks performed
+
+Ran checks in the integrated browser against the local `file://` page. The temporary `nexora:demo-profile`, `nexora:demo-saved`, and `nexora:demo-recruiter-listings` values were restored afterward.
+
+- Started with a saved Published recruiter listing and a student profile containing test-only provided fields; Applicants showed an honest empty state and a zero count.
+- Added a student-tracker application by selecting that listing. The record contained its stable job ID, recruiter listing ID, and profile/candidate ID. The recruiter Applicants view showed the linked record.
+- Added an unlinked manual tracker record and confirmed it did not appear in recruiter results.
+- Expanded candidate details and verified provided headline, education, skill and project/repository link appeared. The view did not display tracker notes.
+- Set recruiter demo status to Shortlisted and confirmed the record kept student status Applied while saving separate recruiter status and update timestamp. After reload, recruiter status persisted.
+- Changed student status to Viewed in the student tracker and confirmed recruiter status, update timestamp, candidate ID, and listing ID were preserved. Student view showed recruiter status separately.
+- Filtered by a status with no matching records, then by listing and searched candidate name; results updated as expected.
+- Opened the external Apply Now review for the linked recruiter job and confirmed it did not add an application record.
+- Removed recruiter listing data and confirmed Applicants showed the no-listings state without crashing; the student application snapshot remained in the profile. Malformed profile JSON showed an explicit Applicant data unavailable state.
+- At 390px, recruiter applicant navigation and layout showed no horizontal overflow.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parser checked `index.html` and found no duplicate IDs — PASS.
+
+### Failures and remaining checks
+
+- The first browser attempt used a local HTTP page whose server was no longer running (`ERR_CONNECTION_REFUSED`). It did not exercise the app. Checks were rerun successfully against the available local `file://` page.
+- `python tests\regression_test.py` could not start because Python Playwright is not installed (`ModuleNotFoundError`). The interactive checks are not a run of that automated suite.
+- No cross-browser, physical-device, keyboard-only, or screen-reader test was performed.
+- This demo stores one profile and listings in one browser. Cross-user application visibility, employer responses, notifications, identity verification, and a shared backend were not tested and are not implemented.
+
 ## Phase 3, Step 3.2 — recruiter job publishing & management
 
 ### Checks performed

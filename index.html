@@ -624,6 +624,7 @@
         </div>
         <button type="button" class="student-shell__nav is-active" data-recruiter-route="dashboard">Dashboard</button>
         <button type="button" class="student-shell__nav" data-recruiter-route="listings">My Job Listings</button>
+        <button type="button" class="student-shell__nav" data-recruiter-route="applications">Applicants</button>
         <button type="button" class="student-shell__nav" data-recruiter-route="explore">Main job explorer</button>
       </aside>
 
@@ -636,7 +637,7 @@
             </div>
             <button class="btn btn--primary" type="button" data-recruiter-create>New job draft</button>
           </div>
-          <p class="recruiter-notice">Listings are saved only in this browser. Published entries appear in this browser’s job explorer, but are not shared with other visitors or verified by NEXORA.</p>
+          <p class="recruiter-notice">Listings are saved only in this browser. Published entries appear in this browser’s job explorer, but are not shared with other visitors or verified by NEXORA. The 15-day policy is a local demo check, not secure or server-enforced. It cannot run while this browser is closed or synchronize devices.</p>
           <div class="recruiter-metrics" aria-live="polite">
             <article class="student-card recruiter-metric">
               <h3>Total listings</h3>
@@ -658,6 +659,15 @@
             <article class="student-card recruiter-metric">
               <h3>Unpublished listings</h3>
               <strong id="recruiter-unpublished-count">0</strong>
+            </article>
+            <article class="student-card recruiter-metric recruiter-metric--review">
+              <h3>Needs review</h3>
+              <strong id="recruiter-review-count">0</strong>
+              <p>Expired from the active explorer after 15 days</p>
+            </article>
+            <article class="student-card recruiter-metric">
+              <h3>Recorded applicants</h3>
+              <strong id="recruiter-applicant-count">0</strong>
             </article>
           </div>
           <section class="student-card recruiter-recent">
@@ -690,12 +700,50 @@
                 <option value="all">All statuses</option>
                 <option value="Draft">Draft</option>
                 <option value="Published">Published</option>
+                <option value="Expired">Needs Review</option>
                 <option value="Closed">Closed</option>
                 <option value="Unpublished">Unpublished</option>
               </select>
             </div>
           </div>
           <ul class="recruiter-list" id="recruiter-listings"></ul>
+        </section>
+
+        <section class="recruiter-view" id="recruiter-applications-view" hidden aria-labelledby="recruiter-applications-title">
+          <div class="student-card__head">
+            <div>
+              <p class="student-banner__eyebrow">Local demo applicant records</p>
+              <h2 id="recruiter-applications-title">Applicants</h2>
+            </div>
+            <span class="badge badge--sage" id="recruiter-applicant-total">0 recorded</span>
+          </div>
+          <p class="recruiter-notice">Only applications explicitly recorded in this browser and associated with your saved recruiter listings are shown. This demo has one local student profile; it cannot receive applications from other browsers or users. Student-entered statuses are separate from recruiter demo updates. No notifications are sent.</p>
+          <p class="auth-status" id="recruiter-applicant-message" role="status" aria-live="polite"></p>
+          <div class="recruiter-filters recruiter-applicant-filters">
+            <div class="field-group">
+              <label for="recruiter-applicant-search">Search applicants</label>
+              <input class="input" id="recruiter-applicant-search" type="search" autocomplete="off" placeholder="Candidate name or job title">
+            </div>
+            <div class="field-group">
+              <label for="recruiter-applicant-job-filter">Filter by your listing</label>
+              <select class="select" id="recruiter-applicant-job-filter">
+                <option value="">All your listings</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="recruiter-applicant-status-filter">Filter by status</label>
+              <select class="select" id="recruiter-applicant-status-filter">
+                <option value="">All statuses</option>
+                <option value="Applied">Applied</option>
+                <option value="Viewed">Viewed</option>
+                <option value="In Review">In Review</option>
+                <option value="Shortlisted">Shortlisted</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+          </div>
+          <ul class="recruiter-list" id="recruiter-applicant-list"></ul>
         </section>
 
         <section class="recruiter-view" id="recruiter-editor-view" hidden aria-labelledby="recruiter-editor-title">

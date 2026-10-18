@@ -9,6 +9,23 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
+## Phase 3, Step 3.3 — Recruiter Applicant Management
+
+### Storage relationship and limitations
+- No new storage key is introduced. Explicitly saved student tracker applications remain in `nexora:demo-profile`; recruiter listings remain in `nexora:demo-recruiter-listings`.
+- Applications selected from a recruiter-created job carry the stable `jobId` and `recruiterListingId`. A browser-local `profileId`/application `candidateId` is assigned on explicit application save where missing. Older records can be matched by the existing stable job ID. Unlinked manual entries and other jobs are not shown to recruiters.
+- The app has only one browser-local student profile. This supports a same-browser demonstration, not communication between actual students and recruiters, separate browsers, or devices. No backend or shared applicant database exists.
+
+### Applicant UI and status behaviour
+- Recruiter navigation includes Applicants, with actual associated-record counts and filters by saved listing and effective status plus search by candidate name/job title.
+- Candidate details expose only user-provided name, headline, education, skills, projects, and valid HTTP(S) GitHub/portfolio/project links. Email, application notes, passwords, and unrelated localStorage keys are excluded. No candidate or project verification is claimed.
+- Student status remains in `application.status`. A recruiter update uses separate `recruiterStatus` and `recruiterUpdatedAt` fields in that same record. The tracker presents both sources distinctly; opening Applicants does not change status and no notifications are sent.
+- Missing/malformed profile or listing records render explicit unavailable/empty states. Applications remain saved in the profile when their recruiter listing is deleted but are no longer attributed to an active saved recruiter listing.
+
+### Validation
+- Integrated-browser checks covered explicit application-to-listing association, applicant filtering/search, candidate details, recruiter status persistence/source separation, external Apply Now not recording an application, deleted/malformed data handling, existing-profile editing, and mobile layout. Temporary browser fixtures were restored.
+- Static JavaScript syntax and HTML duplicate-ID checks passed. The optional Python Playwright suite could not start because the package is missing.
+
 ## Phase 3, Step 3.2 — Recruiter Job Publishing & Management
 
 ### Scope, storage, and truthfulness
