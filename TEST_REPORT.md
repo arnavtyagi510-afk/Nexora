@@ -1,5 +1,53 @@
 # NEXORA — Test Report
 
+## Phase 4, Step 4.1 — company verification, trust indicators, and job reports
+
+### Integrated-browser checks performed
+
+Checks ran on the local `file://` page with test-only browser storage fixtures. Each test captured and restored the previous values for the student profile, saved jobs, recruiter listings, company profile, and reports.
+
+- Created and edited a company profile (company name, website, business email domain, description, industry, location, public links); verified Save success and persistence after reload.
+- Verified an incomplete company profile can be saved, but submitting a verification request requires company name, valid HTTP(S) website, and a business email domain. Unsafe website URL, `@` email value, and unsafe public link were rejected while the prior record remained unchanged.
+- Confirmed a submitted request persisted as **Pending Review** with a timestamp; no Verified status or reviewer notification was claimed. A locally stored `Verified` value displayed as **Not Submitted**. A Rejected record displayed the local-data caveat and could be resubmitted as Pending Review.
+- Confirmed matching recruiter listing cards and details showed Pending Review and provided company public details; a base listing showed Company not verified and still exposed the report action.
+- Report form required a reason; a report with optional explanation was stored with job/recruiter listing/company IDs, timestamp, and Submitted status. Confirmation stated no review had occurred. Reopening the job and repeating the same reason was blocked. Report remained after reload.
+- Malformed company profile and report storage displayed unavailable/read errors and were not overwritten.
+- At 390px, opened the Trust Center through the mobile menu and verified no horizontal overflow.
+- Regression checks: created a draft through recruiter UI, edited the existing draft without duplication, published it, confirmed it appeared in Job Explorer with initial activity timestamps, and verified publication survived refresh; bookmarked the recruiter listing and confirmed bookmark persistence; external Apply Now did not create a student application; student status/notes persisted and did not alter recruiter activity; a 16-day listing expired while a 14-day listing remained Published.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parser checked `index.html`; no duplicate IDs — PASS.
+
+### Failures and remaining checks
+
+- Initial browser attempts used a card locator that did not target the detail button and a hidden desktop navigation control at mobile width; reruns used the card-scoped button and mobile menu and passed.
+- One publish regression attempt expected a Draft's Save Changes action to publish; it correctly remained a Draft. The follow-up used the explicit Publish action and passed.
+- `python tests\regression_test.py` was not run because Python Playwright is unavailable (`ModuleNotFoundError`). Browser checks above are interactive integrated-browser checks, not an execution of that test suite.
+- No physical-device, cross-browser, keyboard-only, or screen-reader testing was performed. There is no real authorized reviewer/backend; request/report records are local and can’t be shared or securely reviewed.
+
+# Phase 3, Step 3.4 — recruiter accountability and 15-day activity policy
+
+### Integrated-browser checks performed
+
+Checks ran on the local `file://` page with temporary `nexora:demo-profile`, `nexora:demo-saved`, and `nexora:demo-recruiter-listings` fixtures. Test fixtures were removed/restored after each run.
+
+- Created and published a recruiter listing through the form. Confirmed a valid `publishedAt`, `lastRecruiterActivityAt`, initial `published` audit event, and displayed review deadline.
+- With dated fixtures, confirmed a listing older than 15 days changed to **Needs Review** / `Expired`, while a 14-day listing remained active. Opening/reloading did not reset activity; the expired record disappeared from active opportunities.
+- Confirmed **Reconfirm Vacancy** and verified the listing became active again with a new timestamp/event. Review/expiry event persisted across reload without duplication.
+- Expanded candidate details and verified `application_reviewed` event/timestamp. Saving the same status produced no new event. Changing recruiter status added a timestamped application-linked event, kept the student's `Applied` status unchanged, and persisted recruiter status after refresh.
+- Changed the student's own application status in the student tracker and confirmed that the recruiter activity timestamp and event history did not change.
+- Confirmed an invalid activity timestamp is handled safely: the listing moved to Needs Review, one `review_required` event persisted after reload, and it did not appear in Job Explorer.
+- Confirmed Closed remained Closed, exposed no Reconfirm Vacancy control, and showed the explicit **Reopen & publish** action. Confirmed an expired listing could not be republished through the editor's Preview/Publish path.
+- At 390px, used the mobile menu to open the recruiter portal and verified the listing/review details had no horizontal overflow.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parsing of `index.html` — PASS; no duplicate IDs.
+
+### Failures and remaining checks
+
+- An initial integrated-browser test stopped on an ambiguous locator after the expiry and reconfirm checks had already passed. A follow-up with a scoped selector completed candidate review, status-change, same-status, and persistence checks successfully.
+- One mobile browser attempt targeted the hidden desktop navigation control; the check was rerun through the mobile menu and passed.
+- `python tests\regression_test.py` was attempted but could not start because Python Playwright is unavailable (`ModuleNotFoundError`). Browser checks above are interactive integrated-browser checks, not a run of that suite.
+- No physical-device, cross-browser, keyboard-only, or screen-reader testing was performed. Browser-local enforcement cannot run while closed, is not server-secure, and does not synchronize across users/devices.
+
 ## Phase 3, Step 3.3 — recruiter applicant management
 
 ### Integrated-browser checks performed

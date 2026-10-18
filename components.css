@@ -344,6 +344,15 @@
 .recruiter-local-badge { margin-top: var(--space-1); }
 .recruiter-status--unpublished { color: var(--color-text); background: var(--color-sage); border: 1px dashed var(--color-border-strong); }
 .recruiter-status--expired { color: var(--color-text); background: var(--color-sage); border: 1px solid var(--color-primary); }
+.recruiter-status--pending { color: var(--color-text); background: var(--color-mint); border: 1px dashed var(--color-border-strong); }
+.recruiter-status--rejected { color: var(--color-text); background: var(--color-sage); border: 1px solid var(--color-border-strong); }
+.trust-badge { margin-top: var(--space-1); }
+.trust-badge--pending { background: var(--color-mint); }
+.trust-badge--rejected, .trust-badge--not-submitted { background: var(--color-sage); }
+.recruiter-trust-explanation { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-primary); background: var(--color-mint); border-radius: var(--radius-sm); }
+.recruiter-trust-feedback { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.recruiter-trust-feedback h3 { font-size: var(--text-base); }
+.recruiter-trust-feedback p { margin-top: var(--space-2); }
 .recruiter-review { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border-left: 3px solid var(--color-primary); background: var(--color-mint); border-radius: var(--radius-sm); font-size: var(--text-sm); }
 .recruiter-review--urgent { border-left-color: var(--color-text); background: var(--color-sage); }
 .recruiter-activity { margin-top: var(--space-2); font-size: var(--text-sm); }
@@ -474,6 +483,14 @@ body.is-modal { overflow: hidden; }
 .jv__status { min-height: 0; font-size: var(--text-sm); color: var(--color-text); }
 .jv__status:empty { display: none; }
 .dialog .jv__status { margin: 0; padding: var(--space-3) var(--space-4); background: var(--color-mint); border-radius: var(--radius-md); }
+.jv__trust { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow-wrap: anywhere; }
+.jv__trust h3, .jv__trust p { margin: 0; }
+.jv__trust .jv__summary { margin-top: var(--space-2); }
+.trust-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.jv__report-form { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); }
+.jv__report-form h3, .jv__report-form p { margin: 0; }
+.jv__report-form label { font-size: var(--text-sm); font-weight: 700; }
+.jv__report-form .select, .jv__report-form .input { width: 100%; }
 @media (max-width: 30rem) {
   .jv__actions .btn { flex: 1 1 100%; }
   .jv__summary { grid-template-columns: 1fr; gap: 0; }

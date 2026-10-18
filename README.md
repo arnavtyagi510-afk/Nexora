@@ -1,6 +1,24 @@
-# NEXORA — Phase 3, Step 3.3 (recruiter applicant management)
+# NEXORA — Phase 4, Step 4.1 (company trust center)
 
 NEXORA is a career-tech platform for students, freshers, and job seekers. This project keeps the existing homepage and job-discovery flows intact while adding frontend-only student and recruiter portals.
+
+## Phase 4.1 highlights
+
+- Recruiters can maintain a local Company Profile with company name, official website, business email domain, description, industry, location, public links, and optional reviewer supporting information. Profile and requests persist in `nexora:demo-company-profile`.
+- Request submission validates the website, email domain, and public links. A saved request remains **Pending Review**; this app has no authorized reviewer and can never grant **Verified**. Website/domain/document details alone are not treated as proof. The interface explains Not Submitted, Pending Review, Verified, and Rejected.
+- Company trust is separate from job publication and the 15-day recruiter activity status. Job Explorer cards, recruiter listings, and details show the separate company trust status; matching uses company name. Job details disclose provided public company information and allow reporting.
+- Students can report a job or recruiter for suspected scam, payment requested, misleading description, impersonation, suspicious external link, or another concern, with optional details. Reports persist in `nexora:demo-job-reports`; duplicate job/reason reports are blocked. A confirmation says the report is local and unreviewed.
+- Malformed company/report storage is reported without overwriting it. Neither these local records nor reviewer history are tamper-proof.
+- A real verification/report-review workflow, reviewer feedback, cross-device syncing, and fraud prevention require authorized backend services. No documents are uploaded or email notifications sent.
+
+## Phase 3.4 highlights
+
+- Published recruiter listings receive a publication timestamp and initial activity event. The 15-day review deadline uses the latest recorded recruiter action, falling back to the publication timestamp.
+- Candidate-detail review, recruiter applicant-status changes, explicit vacancy reconfirmation, closing, unpublishing, and expiry/review are recorded as dated listing events. Applicant-linked events store only the application ID; the event history is bounded to the latest 100 entries.
+- Published listings that reach 15 days without a valid recruiter activity timestamp become **Needs Review** (stored as `Expired`) and are removed from active Job Explorer results. Draft, Closed, and Unpublished remain distinct states.
+- Recruiters can explicitly reconfirm Published or expired listings after confirmation. An expired listing cannot be republished through the editor's Preview/Publish path; closed listings require the clearly labelled **Reopen & publish** action.
+- The dashboard shows last recruiter activity, the review deadline/countdown, and listings needing review. Opening the portal or refreshing does not reset the review window; student actions do not update recruiter activity.
+- This is a browser-local demo check, not secure enforcement: it runs on page load and periodically while open, cannot run while the browser is closed, and cannot synchronize devices or users. A backend and scheduled server-side job would be required for reliable enforcement.
 
 ## Phase 3.3 highlights
 
@@ -46,6 +64,14 @@ Plain **HTML + CSS + JavaScript**. There is no `package.json`, no build step, no
 ## Validation status
 
 Actual validation performed:
+- Step 4.1 integrated-browser checks covered company profile create/edit and refresh persistence; validation of optional profile fields versus required request fields; Pending Review without a false Verified state; rejected-record explanation and resubmission; downgrade of a locally supplied Verified value; matching pending company status on job cards/details; report reasons, required-reason validation, report persistence, duplicate prevention and truthful confirmation; malformed storage handling; 390px Trust Center navigation/layout; and preserved recruiter publishing, bookmarks, application tracking and 15-day expiry.
+- Step 4.1 test fixtures were restored after each integrated-browser check.
+- Static JavaScript syntax and HTML duplicate-ID checks passed. `python tests\regression_test.py` could not start because Python Playwright is unavailable (`ModuleNotFoundError`).
+- Step 3.4 integrated-browser checks verified initial publication timestamps/events, an aged listing expiring while a 14-day listing remained active, no timer reset from opening/reloading, removal from active results, confirmed reconfirmation and restored visibility, invalid timestamp handling with a persisted single review event, and no duplicate event after refresh.
+- Step 3.4 browser checks verified candidate review and recruiter status-change events/timestamps, no event for a same-status save, status persistence without overwriting the student-entered status, and that a student status update does not alter recruiter activity. Closed listings remained closed and had no reconfirm action; the explicit reopen action was shown. An expired listing's editor Preview/Publish route was blocked in favor of Reconfirm Vacancy.
+- At 390px, the mobile menu opened the recruiter portal and the listing with review details had no horizontal overflow.
+- Step 3.4 fixtures were removed after browser checks. `node --check assets/js/main.js` passed; Python standard-library parsing of `index.html` passed with no duplicate IDs.
+- `python tests\regression_test.py` was attempted but could not start because Python Playwright is unavailable (`ModuleNotFoundError`). The interactive browser checks are not a run of that automated suite.
 - Step 3.3 integrated-browser checks covered the empty Applicants state, saving a tracker application linked to a recruiter listing by stable IDs, excluding an unlinked manual record, candidate details and safe provided links, recruiter status/timestamp persistence, recruiter-vs-student status distinction after student editing, listing/status/search filters, external Apply Now not creating a record, deleted-job and malformed-profile handling, and 390px layout.
 - Step 3.3 browser fixtures were temporary and restored after the checks.
 - Step 3.2 integrated-browser checks against the local `file://` page covered draft creation and preview, publishing into Job Explorer, recruiter-entered detail fields, edit without duplication, unpublish/close/reopen, search and status filters, sorting, persistence after reload, bookmark retention and reattachment, safe application snapshots after close/delete, delete confirmation, and recruiter mobile navigation/layout.
@@ -108,7 +134,7 @@ An internet connection is only needed for the Google Font (Plus Jakarta Sans). O
 - The dashboard profile overview shows project details and available links. Links open in a new tab with `noopener noreferrer`. “Project added by student” and “Repository link provided” are descriptive labels only; NEXORA does not verify projects, repository contents, contributions, or skills.
 - A **Reset demo profile data** button clears the locally saved onboarding data. The job explorer remains available as the guest experience, and users can return to browsing at any time without losing the search/filter state in the list.
 
-### Recruiter portal (Steps 3.1–3.3)
+### Recruiter portal (Steps 3.1–3.4)
 
 - Choose **Recruiter** in the site menu to open the separate recruiter workspace; it does not require or create an account.
 - Choose **Create Job**, enter the required fields, and use **Save as Draft**, **Preview Job**, or **Publish Job**. Published listings appear in this browser's student Job Explorer; they are not shared with other visitors.
@@ -117,6 +143,13 @@ An internet connection is only needed for the Google Font (Plus Jakarta Sans). O
 - Recruiter listings are independent of student profile data. Bookmarking and applications remain local to this browser; no external submission or employer response is implied.
 - **Applicants** shows only records saved through this browser's student tracker and linked by listing/job ID. Candidate details contain only student-provided profile information. Recruiter demo statuses are separate, local-only values; no student notification is sent.
 - A local recruiter workspace cannot receive applications from another user, browser, or device. Do not use this demo to handle real applicant information.
+
+### Company Trust Center & job reports (Step 4.1)
+
+- In the recruiter portal open **Company Trust Center** to save or edit a company profile. Company name is needed to save; a verification request additionally needs a valid HTTP(S) website and business email domain.
+- **Submit verification request** stores a local request as **Pending Review**. No reviewer is connected, so it cannot become **Verified**. Website/domain information is not proof by itself. Supporting information is only stored locally; no document is uploaded.
+- Company trust status appears separately from the job's publication status and the recruiter's 15-day activity policy. Job details show matching provided public company information.
+- Use **Report this job or recruiter** in job details to choose a reason and optionally add details. A duplicate report for the same job and reason is blocked. Reports are browser-local and are not reviewed or resolved by this demo.
 
 1. Open `index.html` and click **View details** on any card. The dialog shows that job's own data, a **Demo listing** badge, and plain wording that it is fictional. Use the **X**, the **Close** button, **Escape**, or a click outside to close. Your search and filters are untouched, and focus returns to the card.
 2. In the dialog click **Apply Now**. For these demo listings you get a friendly explanation that it is sample data and cannot accept an application. You stay on NEXORA and nothing is sent or saved.

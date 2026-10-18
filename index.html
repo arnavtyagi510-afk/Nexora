@@ -625,6 +625,7 @@
         <button type="button" class="student-shell__nav is-active" data-recruiter-route="dashboard">Dashboard</button>
         <button type="button" class="student-shell__nav" data-recruiter-route="listings">My Job Listings</button>
         <button type="button" class="student-shell__nav" data-recruiter-route="applications">Applicants</button>
+        <button type="button" class="student-shell__nav" data-recruiter-route="trust">Company Trust Center</button>
         <button type="button" class="student-shell__nav" data-recruiter-route="explore">Main job explorer</button>
       </aside>
 
@@ -744,6 +745,80 @@
             </div>
           </div>
           <ul class="recruiter-list" id="recruiter-applicant-list"></ul>
+        </section>
+
+        <section class="recruiter-view" id="recruiter-trust-view" hidden aria-labelledby="recruiter-trust-title">
+          <div class="student-card">
+            <div class="student-card__head">
+              <div>
+                <p class="student-banner__eyebrow">Company information · local demo</p>
+                <h2 id="recruiter-trust-title">Company Profile &amp; Trust Center</h2>
+              </div>
+              <span class="recruiter-status recruiter-status--unpublished" id="company-verification-status">Not Submitted</span>
+            </div>
+            <p class="recruiter-notice">Company profile and verification requests are stored only in this browser. There is no authorized reviewer or verification backend here, so a submitted request stays Pending Review and cannot become Verified in this demo. A website, email domain, or document by itself does not prove legitimacy.</p>
+            <p class="recruiter-trust-explanation" id="company-verification-explanation" role="status" aria-live="polite"></p>
+            <p class="recruiter-listing__meta" id="company-submission-date" hidden></p>
+            <details class="recruiter-trust-status-help">
+              <summary>What verification statuses mean</summary>
+              <ul>
+                <li><strong>Not Submitted:</strong> no request has been made; company information is unreviewed.</li>
+                <li><strong>Pending Review:</strong> submitted for review; no approval has been granted.</li>
+                <li><strong>Verified:</strong> approved through a real, documented verification process. This demo has no such process and cannot grant this status.</li>
+                <li><strong>Rejected:</strong> a reviewer declined a request and supplied feedback. This demo cannot make reviewer decisions.</li>
+              </ul>
+            </details>
+            <form id="company-profile-form" novalidate>
+              <div class="student-form-grid">
+                <div class="field-group">
+                  <label for="company-profile-name">Company name</label>
+                  <input class="input" id="company-profile-name" name="companyName" type="text" maxlength="120" required>
+                  <p class="field-error" id="company-profile-name-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="company-profile-website">Official website</label>
+                  <input class="input" id="company-profile-website" name="website" type="url" inputmode="url" placeholder="https://example.com" required>
+                  <p class="field-error" id="company-profile-website-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="company-profile-domain">Business email domain</label>
+                  <input class="input" id="company-profile-domain" name="emailDomain" type="text" inputmode="url" placeholder="example.com" maxlength="253" required>
+                  <p class="field-error" id="company-profile-domain-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group">
+                  <label for="company-profile-industry">Industry (optional)</label>
+                  <input class="input" id="company-profile-industry" name="industry" type="text" maxlength="100">
+                </div>
+                <div class="field-group">
+                  <label for="company-profile-location">Location (optional)</label>
+                  <input class="input" id="company-profile-location" name="location" type="text" maxlength="120">
+                </div>
+                <div class="field-group field-group--full">
+                  <label for="company-profile-description">Company description (optional)</label>
+                  <textarea class="input" id="company-profile-description" name="description" rows="4" maxlength="2000"></textarea>
+                </div>
+                <div class="field-group field-group--full">
+                  <label for="company-profile-links">Public links (optional; comma-separated HTTP/HTTPS URLs)</label>
+                  <input class="input" id="company-profile-links" name="publicLinks" type="text" maxlength="1000" placeholder="https://example.com/about, https://www.linkedin.com/company/example">
+                  <p class="field-error" id="company-profile-links-error" aria-live="polite"></p>
+                </div>
+                <div class="field-group field-group--full">
+                  <label for="company-profile-support">Supporting information for a reviewer (optional)</label>
+                  <textarea class="input" id="company-profile-support" name="supportingInfo" rows="3" maxlength="1500"></textarea>
+                </div>
+              </div>
+              <div class="student-form-controls recruiter-form-controls">
+                <button class="btn btn--secondary" type="button" id="company-profile-save">Save company profile</button>
+                <button class="btn btn--primary" type="button" id="company-verification-submit">Submit verification request</button>
+              </div>
+              <p class="auth-status" id="company-profile-message" role="status" aria-live="polite"></p>
+            </form>
+            <div class="recruiter-trust-feedback">
+              <h3>Reviewer feedback</h3>
+              <p id="company-reviewer-feedback">No reviewer feedback is available.</p>
+              <p class="recruiter-listing__note">This demo has no reviewer. A local submission is not reviewed, approved, or shared with NEXORA.</p>
+            </div>
+          </div>
         </section>
 
         <section class="recruiter-view" id="recruiter-editor-view" hidden aria-labelledby="recruiter-editor-title">

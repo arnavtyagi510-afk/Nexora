@@ -1585,6 +1585,8 @@
 
   /* ---------- Recruiter portal (browser-local demo only) ---------- */
   var RECRUITER_LISTINGS_KEY = "nexora:demo-recruiter-listings";
+  var COMPANY_PROFILE_KEY = "nexora:demo-company-profile";
+  var JOB_REPORTS_KEY = "nexora:demo-job-reports";
   var RECRUITER_REVIEW_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
   var recruiterForm = document.getElementById("recruiter-listing-form");
   var recruiterFormStatus = document.getElementById("recruiter-form-status");
@@ -1600,6 +1602,266 @@
     if (recruiterFormStatus) recruiterFormStatus.textContent = message || "";
     var listingStatus = document.getElementById("recruiter-listing-status");
     if (listingStatus) listingStatus.textContent = message || "";
+  }
+
+  function normalizeCompanyProfile(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    var status = ["Pending Review", "Rejected"].indexOf(value.verificationStatus) >= 0 ? value.verificationStatus : "Not Submitted";
+    var website = String(value.website || "").trim();
+    if (website && !isHttpUrl(website)) website = "";
+    var publicLinks = Array.isArray(value.publicLinks) ? value.publicLinks : [];
+    return {
+      id: String(value.id || ""),
+      companyName: String(value.companyName || "").trim(),
+      website: website,
+      emailDomain: String(value.emailDomain || "").trim().toLowerCase(),
+      description: String(value.description || "").trim(),
+      industry: String(value.industry || "").trim(),
+      location: String(value.location || "").trim(),
+      publicLinks: publicLinks.filter(isHttpUrl).slice(0, 10),
+      supportingInfo: String(value.supportingInfo || "").trim(),
+      verificationStatus: status,
+      submittedAt: String(value.submittedAt || ""),
+      reviewerFeedback: String(value.reviewerFeedback || "").trim()
+    };
+  }
+
+  function readCompanyProfile() {
+    try {
+      var raw = window.localStorage.getItem(COMPANY_PROFILE_KEY);
+      if (raw === null) return { profile: null, error: "" };
+      var parsed = JSON.parse(raw);
+      var profile = normalizeCompanyProfile(parsed);
+      if (!profile) return { profile: null, error: "Company profile data is malformed and was not changed." };
+      return { profile: profile, error: "" };
+    } catch (error) {
+      return { profile: null, error: "Company profile could not be read from this browser. No data was changed." };
+    }
+  }
+
+  function companyTrustForName(name) {
+    var result = readCompanyProfile();
+    var profile = result.profile;
+    if (!profile || !name || profile.companyName.toLowerCase() !== String(name).trim().toLowerCase()) {
+      return { status: "Not Submitted", profile: null };
+    }
+    return { status: profile.verificationStatus, profile: profile };
+  }
+
+  function readJobReports() {
+    try {
+      var raw = window.localStorage.getItem(JOB_REPORTS_KEY);
+      if (raw === null) return { reports: [], error: "" };
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return { reports: [], error: "Saved reports are malformed and were not changed." };
+      if (parsed.some(function (report) {
+        return !report || typeof report !== "object" || !report.id || !report.jobId || !report.reason || !report.timestamp;
+      })) return { reports: [], error: "Saved reports contain malformed records and were not changed." };
+      return { reports: parsed, error: "" };
+    } catch (error) {
+      return { reports: [], error: "Reports could not be read from this browser. No data was changed." };
+    }
+  }
+
+  function openJobReportForm(job, button) {
+    var existing = $("#jv-report-form", jobView);
+    if (existing) {
+      existing.hidden = !existing.hidden;
+      if (button) button.setAttribute("aria-expanded", String(!existing.hidden));
+      if (!existing.hidden) $("#jv-report-reason", existing).focus();
+      return;
+    }
+    var form = el("form", "jv__report-form");
+    form.id = "jv-report-form";
+    form.noValidate = true;
+    var heading = el("h3", null, "Report this job or recruiter");
+    form.appendChild(heading);
+    form.appendChild(el("p", "jv__missing", "Reports are saved only in this browser and are not automatically reviewed or resolved."));
+    var reasonLabel = el("label", null, "Reason for report");
+    reasonLabel.htmlFor = "jv-report-reason";
+    form.appendChild(reasonLabel);
+    var reason = el("select", "select");
+    reason.id = "jv-report-reason";
+    reason.required = true;
+    reason.appendChild(new Option("Choose a reason", ""));
+    ["Suspected scam", "Payment requested", "Misleading description", "Impersonation", "Suspicious external link", "Other concern"].forEach(function (name) {
+      reason.appendChild(new Option(name, name));
+    });
+    form.appendChild(reason);
+    var explanationLabel = el("label", null, "Additional details (optional)");
+    explanationLabel.htmlFor = "jv-report-explanation";
+    form.appendChild(explanationLabel);
+    var explanation = el("textarea", "input");
+    explanation.id = "jv-report-explanation";
+    explanation.rows = 3;
+    explanation.maxLength = 1000;
+    form.appendChild(explanation);
+    var error = el("p", "field-error");
+    error.id = "jv-report-error";
+    error.setAttribute("role", "status");
+    form.appendChild(error);
+    var submit = el("button", "btn btn--secondary", "Record report");
+    submit.type = "button";
+    submit.dataset.action = "report-submit";
+    form.appendChild(submit);
+    jobView.insertBefore(form, $("#jv-status", jobView));
+    if (button) button.setAttribute("aria-expanded", "true");
+    reason.focus();
+  }
+
+  function saveJobReport(job) {
+    var form = $("#jv-report-form", jobView);
+    var reason = $("#jv-report-reason", form);
+    var explanation = $("#jv-report-explanation", form);
+    var error = $("#jv-report-error", form);
+    if (!reason || !reason.value) {
+      if (error) error.textContent = "Choose a reason before recording the report.";
+      if (reason) reason.focus();
+      return;
+    }
+    var stored = readJobReports();
+    if (stored.error) {
+      if (error) error.textContent = stored.error;
+      return;
+    }
+    if (stored.reports.some(function (report) {
+      return String(report.jobId) === String(job.id) && report.reason === reason.value;
+    })) {
+      if (error) error.textContent = "A report with this reason is already recorded for this job in this browser.";
+      return;
+    }
+    var reports = stored.reports.concat([{
+      id: "report_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      jobId: String(job.id),
+      recruiterListingId: String(job.recruiterListingId || ""),
+      companyId: String(job.companyProfileId || ""),
+      companyName: String(job.company || ""),
+      jobTitle: String(job.title || ""),
+      reason: reason.value,
+      explanation: explanation ? explanation.value.trim() : "",
+      timestamp: new Date().toISOString(),
+      status: "Submitted"
+    }]);
+    try {
+      window.localStorage.setItem(JOB_REPORTS_KEY, JSON.stringify(reports));
+    } catch (storageError) {
+      if (error) error.textContent = "Report could not be saved in this browser. Check storage and try again.";
+      return;
+    }
+    if (error) error.textContent = "Report recorded locally. It has not been reviewed or resolved.";
+    setStatus("Your report is recorded in this browser only; no review or resolution is implied.");
+    var submit = $('[data-action="report-submit"]', form);
+    if (submit) submit.disabled = true;
+  }
+
+  function companyProfileFormData() {
+    var current = readCompanyProfile();
+    var old = current.profile || {};
+    var linksText = document.getElementById("company-profile-links").value.trim();
+    return {
+      id: old.id || "company_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      companyName: document.getElementById("company-profile-name").value.trim(),
+      website: document.getElementById("company-profile-website").value.trim(),
+      emailDomain: document.getElementById("company-profile-domain").value.trim().toLowerCase(),
+      industry: document.getElementById("company-profile-industry").value.trim(),
+      location: document.getElementById("company-profile-location").value.trim(),
+      description: document.getElementById("company-profile-description").value.trim(),
+      publicLinks: linksText ? linksText.split(",").map(function (link) { return link.trim(); }).filter(Boolean) : [],
+      supportingInfo: document.getElementById("company-profile-support").value.trim(),
+      verificationStatus: old.verificationStatus || "Not Submitted",
+      submittedAt: old.submittedAt || "",
+      reviewerFeedback: old.reviewerFeedback || ""
+    };
+  }
+
+  function companyProfileErrors(profile, requireVerificationDetails) {
+    var errors = {};
+    if (!profile.companyName) errors["company-profile-name"] = "Enter the company name.";
+    if ((requireVerificationDetails && !profile.website) || (profile.website && !isHttpUrl(profile.website))) {
+      errors["company-profile-website"] = "Enter a valid official HTTP or HTTPS website URL.";
+    }
+    if ((requireVerificationDetails && !profile.emailDomain) ||
+        (profile.emailDomain && !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(profile.emailDomain))) {
+      errors["company-profile-domain"] = "Enter a business email domain such as example.com, without an @.";
+    }
+    if (profile.publicLinks.some(function (link) { return !isHttpUrl(link); })) errors["company-profile-links"] = "Each public link must be a valid HTTP or HTTPS URL.";
+    return errors;
+  }
+
+  function renderCompanyTrustCenter() {
+    var result = readCompanyProfile();
+    var form = document.getElementById("company-profile-form");
+    if (!form) return;
+    if (result.error) {
+      document.getElementById("company-profile-message").textContent = result.error;
+      document.getElementById("company-verification-status").textContent = "Unavailable";
+      document.getElementById("company-verification-explanation").textContent = "Saved company data could not be read safely.";
+      return;
+    }
+    var profile = result.profile;
+    if (profile) {
+      [
+        ["company-profile-name", profile.companyName], ["company-profile-website", profile.website],
+        ["company-profile-domain", profile.emailDomain], ["company-profile-industry", profile.industry],
+        ["company-profile-location", profile.location], ["company-profile-description", profile.description],
+        ["company-profile-links", profile.publicLinks.join(", ")], ["company-profile-support", profile.supportingInfo]
+      ].forEach(function (pair) { document.getElementById(pair[0]).value = pair[1] || ""; });
+    }
+    var status = profile ? profile.verificationStatus : "Not Submitted";
+    var statusBadge = document.getElementById("company-verification-status");
+    statusBadge.textContent = status;
+    statusBadge.className = "recruiter-status recruiter-status--" +
+      (status === "Pending Review" ? "pending" : status === "Rejected" ? "rejected" : "unpublished");
+    var submitted = document.getElementById("company-submission-date");
+    submitted.hidden = !profile || !validRecruiterTimestamp(profile.submittedAt);
+    submitted.textContent = submitted.hidden ? "" : "Request submitted: " + formatRecruiterDate(profile.submittedAt);
+    document.getElementById("company-verification-explanation").textContent = {
+      "Not Submitted": "No verification request has been submitted. Company information is provided by the recruiter and is not independently checked.",
+      "Pending Review": "A demo request was saved locally. No authorized reviewer or verification process is connected, so this is not an approval.",
+      "Rejected": "The browser-local record is marked Rejected. This demo cannot verify that a reviewer made this decision. Update the information and resubmit if appropriate."
+    }[status];
+    document.getElementById("company-reviewer-feedback").textContent = profile && profile.reviewerFeedback
+      ? profile.reviewerFeedback
+      : "No reviewer feedback is available.";
+    document.getElementById("company-profile-message").textContent = "";
+  }
+
+  function saveCompanyProfile(submitRequest) {
+    var current = readCompanyProfile();
+    if (current.error) {
+      document.getElementById("company-profile-message").textContent = current.error;
+      return;
+    }
+    var profile = companyProfileFormData();
+    var errors = companyProfileErrors(profile, submitRequest);
+    ["company-profile-name", "company-profile-website", "company-profile-domain", "company-profile-links"].forEach(function (id) {
+      setFieldError(id, errors[id] || "");
+    });
+    if (Object.keys(errors).length) {
+      document.getElementById("company-profile-message").textContent = submitRequest
+        ? "Complete the company name, official website and business email domain, and fix any invalid public links before submitting."
+        : "Enter a company name and fix any invalid website, email domain, or public links before saving.";
+      var first = document.getElementById(Object.keys(errors)[0]);
+      if (first) first.focus();
+      return;
+    }
+    if (submitRequest) {
+      if (!window.confirm("Submit this company information as a local demo verification request? It will remain Pending Review and is not reviewed or verified by NEXORA.")) return;
+      profile.verificationStatus = "Pending Review";
+      profile.submittedAt = new Date().toISOString();
+      profile.reviewerFeedback = "";
+    }
+    try {
+      window.localStorage.setItem(COMPANY_PROFILE_KEY, JSON.stringify(profile));
+    } catch (error) {
+      document.getElementById("company-profile-message").textContent = "Company profile could not be saved in this browser. Check storage and try again.";
+      return;
+    }
+    renderCompanyTrustCenter();
+    document.getElementById("company-profile-message").textContent = submitRequest
+      ? "Demo verification request saved locally as Pending Review. No reviewer was notified."
+      : "Company profile saved in this browser.";
+    refreshPublishedJobs();
   }
 
   function normalizeRecruiterListings(value) {
@@ -1668,6 +1930,8 @@
   function recruiterListingToJob(listing, id) {
     var salaryMin = Number(listing.salaryMin);
     var salaryMax = Number(listing.salaryMax);
+    var companyTrust = companyTrustForName(listing.company);
+    var companyProfile = companyTrust.profile;
     var salary = listing.salaryMin && listing.salaryMax ? {
       min: salaryMin,
       max: salaryMax,
@@ -1678,6 +1942,14 @@
       id: id,
       recruiterListingId: listing.id,
       source: "recruiter-local-demo",
+      companyProfileId: companyProfile ? companyProfile.id : "",
+      companyTrustStatus: companyTrust.status,
+      companyWebsite: companyProfile ? companyProfile.website : "",
+      companyEmailDomain: companyProfile ? companyProfile.emailDomain : "",
+      companyDescription: companyProfile ? companyProfile.description : "",
+      companyIndustry: companyProfile ? companyProfile.industry : "",
+      companyLocation: companyProfile ? companyProfile.location : "",
+      companyPublicLinks: companyProfile ? companyProfile.publicLinks.slice() : [],
       title: listing.title,
       company: listing.company,
       logo: null,
@@ -1755,87 +2027,106 @@
       setRecruiterStatus("Recruiter listings could not be saved in this browser. Check browser storage and try again.");
       return false;
     }
+  }
 
-    function validRecruiterTimestamp(value) {
-      if (typeof value !== "string" || !value.trim()) return false;
-      var time = Date.parse(value);
-      return isFinite(time) && time > 0;
-    }
+  function validRecruiterTimestamp(value) {
+    if (typeof value !== "string" || !value.trim()) return false;
+    var time = Date.parse(value);
+    return isFinite(time) && time > 0 && time <= Date.now();
+  }
 
-    function addRecruiterActivity(listing, type, timestamp, applicationId) {
-      listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
-      var event = { type: type, timestamp: timestamp };
-      if (applicationId) event.applicationId = applicationId;
-      listing.activityEvents.push(event);
-      listing.activityEvents = listing.activityEvents.slice(-100);
-      listing.lastRecruiterActivityAt = timestamp;
-    }
+  function addRecruiterActivity(listing, type, timestamp, applicationId) {
+    listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
+    var event = { type: type, timestamp: timestamp };
+    if (applicationId) event.applicationId = applicationId;
+    listing.activityEvents.push(event);
+    listing.activityEvents = listing.activityEvents.slice(-100);
+    listing.lastRecruiterActivityAt = timestamp;
+  }
 
-    function applyRecruiterReviewPolicy(listings, now) {
-      var changed = false;
-      var checkedAt = now || new Date();
-      listings.forEach(function (listing) {
-        if (listing.status !== "Published") return;
-        var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
-        var expired = !validRecruiterTimestamp(activityAt) || checkedAt.getTime() - Date.parse(activityAt) >= RECRUITER_REVIEW_WINDOW_MS;
-        if (!expired) return;
-        listing.status = "Expired";
-        listing.updatedAt = checkedAt.toISOString();
-        listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
-        listing.activityEvents.push({ type: "review_required", timestamp: checkedAt.toISOString() });
-        listing.activityEvents = listing.activityEvents.slice(-100);
-        changed = true;
-      });
-      return changed;
-    }
-
-    function getCurrentRecruiterListings() {
-      var listings = readRecruiterListings();
-      if (!listings) return null;
-      if (applyRecruiterReviewPolicy(listings) && !writeRecruiterListings(listings)) return null;
-      return listings;
-    }
-
-    function recruiterReviewDeadline(listing) {
+  function applyRecruiterReviewPolicy(listings, now) {
+    var changed = false;
+    var checkedAt = now || new Date();
+    listings.forEach(function (listing) {
+      if (listing.status !== "Published") return;
       var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
-      if (!validRecruiterTimestamp(activityAt)) return null;
-      return Date.parse(activityAt) + RECRUITER_REVIEW_WINDOW_MS;
-    }
+      var expired = !validRecruiterTimestamp(activityAt) || checkedAt.getTime() - Date.parse(activityAt) >= RECRUITER_REVIEW_WINDOW_MS;
+      if (!expired) return;
+      listing.status = "Expired";
+      listing.updatedAt = checkedAt.toISOString();
+      listing.activityEvents = Array.isArray(listing.activityEvents) ? listing.activityEvents : [];
+      listing.activityEvents.push({ type: "review_required", timestamp: checkedAt.toISOString() });
+      listing.activityEvents = listing.activityEvents.slice(-100);
+      changed = true;
+    });
+    return changed;
+  }
 
-    function recruiterReviewSummary(listing, now) {
-      var deadline = recruiterReviewDeadline(listing);
-      if (listing.status === "Expired") return { text: "Needs review · expired from active opportunities", urgent: true };
-      if (listing.status !== "Published") return { text: "Review window is not active for this status.", urgent: false };
-      if (deadline === null) return { text: "Needs review · activity date unavailable", urgent: true };
-      var remaining = deadline - (now || Date.now());
-      if (remaining <= 0) return { text: "Needs review now · 15-day activity window reached", urgent: true };
-      var days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
-      return { text: "Review due " + formatRecruiterDate(new Date(deadline).toISOString()) + " · " + days + (days === 1 ? " day remaining" : " days remaining"), urgent: days <= 3 };
-    }
+  function getCurrentRecruiterListings() {
+    var listings = readRecruiterListings();
+    if (!listings) return null;
+    if (applyRecruiterReviewPolicy(listings) && !writeRecruiterListings(listings)) return null;
+    return listings;
+  }
 
-    function recruiterActivityLabel(type) {
-      return {
-        published: "Published",
-        reconfirmed: "Vacancy reconfirmed",
-        application_reviewed: "Application reviewed",
-        applicant_status_changed: "Applicant status changed",
-        closed: "Job closed",
-        unpublished: "Job unpublished",
-        review_required: "15-day review required"
-      }[type] || "Recruiter activity";
-    }
+  function recruiterReviewDeadline(listing) {
+    var activityAt = listing.lastRecruiterActivityAt || listing.publishedAt;
+    if (!validRecruiterTimestamp(activityAt)) return null;
+    return Date.parse(activityAt) + RECRUITER_REVIEW_WINDOW_MS;
+  }
 
-    function recordRecruiterListingActivity(listings, listingId, type, applicationId, timestamp) {
-      var at = timestamp || new Date().toISOString();
-      var found = false;
-      listings.forEach(function (listing) {
-        if (listing.id !== listingId) return;
-        found = true;
-        addRecruiterActivity(listing, type, at, applicationId);
-        if (listing.status === "Published") listing.updatedAt = at;
-      });
-      return found;
-    }
+  function recruiterReviewSummary(listing, now) {
+    var deadline = recruiterReviewDeadline(listing);
+    if (listing.status === "Expired") return { text: "Needs review · expired from active opportunities", urgent: true };
+    if (listing.status !== "Published") return { text: "Review window is not active for this status.", urgent: false };
+    if (deadline === null) return { text: "Needs review · activity date unavailable", urgent: true };
+    var remaining = deadline - (now || Date.now());
+    if (remaining <= 0) return { text: "Needs review now · 15-day activity window reached", urgent: true };
+    var days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+    return { text: "Review due " + formatRecruiterDate(new Date(deadline).toISOString()) + " · " + days + (days === 1 ? " day remaining" : " days remaining"), urgent: days <= 3 };
+  }
+
+  function recruiterActivityLabel(type) {
+    return {
+      published: "Published",
+      reconfirmed: "Vacancy reconfirmed",
+      application_reviewed: "Application reviewed",
+      applicant_status_changed: "Applicant status changed",
+      closed: "Job closed",
+      unpublished: "Job unpublished",
+      review_required: "15-day review required"
+    }[type] || "Recruiter activity";
+  }
+
+  function companyTrustLabel(status) {
+    if (status === "Verified") return "Company verified";
+    if (status === "Pending Review") return "Company pending review";
+    if (status === "Rejected") return "Company request rejected";
+    return "Company not verified";
+  }
+
+  function companyTrustExplanation(status) {
+    if (status === "Verified") return "Approved through a real, documented review process.";
+    if (status === "Pending Review") return "A local demo request was saved; no reviewer is connected and this is not approval.";
+    if (status === "Rejected") return "A request is marked rejected; this local demo does not provide reviewer decisions.";
+    return "No completed company verification. Details are recruiter-provided and not independently checked.";
+  }
+
+  function companyTrustClass(status) {
+    return status === "Verified" ? "verified" : status === "Pending Review" ? "pending" :
+      status === "Rejected" ? "rejected" : "not-submitted";
+  }
+
+  function recordRecruiterListingActivity(listings, listingId, type, applicationId, timestamp) {
+    var at = timestamp || new Date().toISOString();
+    var found = false;
+    listings.forEach(function (listing) {
+      if (listing.id !== listingId) return;
+      found = true;
+      addRecruiterActivity(listing, type, at, applicationId);
+      if (listing.status === "Published") listing.updatedAt = at;
+    });
+    return found;
   }
 
   function formatRecruiterDate(value) {
@@ -1858,6 +2149,7 @@
       '<div class="recruiter-listing__content">' +
         '<div class="recruiter-listing__heading"><h3>' + escapeHtml(listing.title) + '</h3><span class="recruiter-status recruiter-status--' + statusClass + '">' + escapeHtml(displayStatus) + '</span></div>' +
         '<p class="recruiter-listing__company">' + escapeHtml(listing.company) + '</p>' +
+        '<p class="recruiter-listing__meta"><strong>Company trust:</strong> ' + escapeHtml(companyTrustLabel(companyTrustForName(listing.company).status)) + '</p>' +
         '<p class="recruiter-listing__meta">' + escapeHtml(listing.location) + ' · ' + escapeHtml(listing.workMode) + ' · ' + escapeHtml(listing.jobType) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Required skills:</strong> ' + escapeHtml(listing.requiredSkills.join(", ")) + '</p>' +
         '<p class="recruiter-listing__meta"><strong>Created:</strong> ' + escapeHtml(formatRecruiterDate(listing.createdAt)) + ' · <strong>Updated:</strong> ' + escapeHtml(formatRecruiterDate(listing.updatedAt)) + '</p>' +
@@ -2085,7 +2377,7 @@
     })[0];
     var nextStatus = selector ? selector.value : "";
     if (studentApplicationStatuses.indexOf(nextStatus) === -1) return;
-    var listings = readRecruiterListings();
+    var listings = getCurrentRecruiterListings();
     var source = readRecruiterApplicantProfile();
     if (!listings || source.error || !source.profile) {
       var message = document.getElementById("recruiter-applicant-message");
@@ -2099,7 +2391,16 @@
       renderRecruiterApplicants(listings);
       return;
     }
+    var currentStatus = row.application.recruiterStatus || row.application.status;
+    if (currentStatus === nextStatus) {
+      var unchangedMessage = document.getElementById("recruiter-applicant-message");
+      if (unchangedMessage) unchangedMessage.textContent = "Status is unchanged; no new activity was recorded.";
+      return;
+    }
     var updatedAt = new Date().toISOString();
+    var previousListings = JSON.parse(JSON.stringify(listings));
+    recordRecruiterListingActivity(listings, row.listing.id, "applicant_status_changed", applicationId, updatedAt);
+    if (!writeRecruiterListings(listings)) return;
     if (!source.profile.profileId) source.profile.profileId = "candidate_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     var normalized = normalizeStudentProfile(source.profile);
     normalized.applications = normalized.applications.map(function (application) {
@@ -2113,6 +2414,7 @@
     });
     source.profile.applications = normalized.applications;
     if (!writeDemoProfile(source.profile)) {
+      writeRecruiterListings(previousListings);
       var errorMessage = document.getElementById("recruiter-applicant-message");
       if (errorMessage) errorMessage.textContent = "Recruiter status could not be saved in this browser.";
       return;
@@ -2120,8 +2422,23 @@
     var successMessage = document.getElementById("recruiter-applicant-message");
     if (successMessage) successMessage.textContent = "Recruiter demo status saved locally. No notification was sent.";
     renderRecruiterApplicants(listings);
+    renderRecruiterPortal();
+    refreshPublishedJobs();
     renderStudentApplicationLists(source.profile);
     renderStudentDashboard();
+  }
+
+  function recordRecruiterApplicationReview(applicationId) {
+    var listings = getCurrentRecruiterListings();
+    var source = readRecruiterApplicantProfile();
+    if (!listings || source.error || !source.profile) return false;
+    var row = recruiterApplicantRows(listings, source.profile).find(function (item) { return item.application.id === applicationId; });
+    if (!row) return false;
+    var at = new Date().toISOString();
+    recordRecruiterListingActivity(listings, row.listing.id, "application_reviewed", applicationId, at);
+    if (!writeRecruiterListings(listings)) return false;
+    refreshPublishedJobs();
+    return true;
   }
 
   function showRecruiterRoute(route) {
@@ -2138,6 +2455,7 @@
       dashboard: document.getElementById("recruiter-dashboard-view"),
       listings: document.getElementById("recruiter-listings-view"),
       applications: document.getElementById("recruiter-applications-view"),
+      trust: document.getElementById("recruiter-trust-view"),
       editor: document.getElementById("recruiter-editor-view")
     };
     $$(".recruiter-view").forEach(function (view) {
@@ -2152,6 +2470,7 @@
     });
     recruiterShell.hidden = false;
     renderRecruiterPortal();
+    if (route === "trust") renderCompanyTrustCenter();
   }
 
   function resetRecruiterForm() {
@@ -2268,7 +2587,7 @@
     var now = new Date().toISOString();
     var minSalary = document.getElementById("recruiter-salary-min").value.trim();
     var maxSalary = document.getElementById("recruiter-salary-max").value.trim();
-    return {
+    var record = {
       id: recruiterListingDraftId || "listing_" + Date.now() + "_" + Math.random().toString(16).slice(2),
       title: document.getElementById("recruiter-job-title").value.trim(),
       company: document.getElementById("recruiter-company").value.trim(),
@@ -2287,8 +2606,18 @@
       applyUrl: document.getElementById("recruiter-apply-url").value.trim(),
       status: status,
       createdAt: existing ? existing.createdAt : now,
-      updatedAt: now
+      updatedAt: now,
+      publishedAt: existing ? existing.publishedAt : "",
+      lastRecruiterActivityAt: existing ? existing.lastRecruiterActivityAt : "",
+      activityEvents: existing ? existing.activityEvents.slice() : []
     };
+    if (status === "Published" && (!existing || existing.status !== "Published")) {
+      record.publishedAt = now;
+      addRecruiterActivity(record, "published", now);
+    } else if (existing && status === "Draft" && existing.status === "Published") {
+      addRecruiterActivity(record, "unpublished", now);
+    }
+    return record;
   }
 
   function saveRecruiterListing(status) {
@@ -2300,9 +2629,13 @@
       setRecruiterStatus(status === "Published" ? "Complete every required field and fix the highlighted values before publishing." : "Fix the highlighted dates, salary range, or application URL before saving the draft.");
       return;
     }
-    var existing = readRecruiterListings();
+    var existing = getCurrentRecruiterListings();
     if (!existing) return;
     var oldRecord = existing.find(function (listing) { return listing.id === recruiterListingDraftId; }) || null;
+    if (status === "Published" && oldRecord && oldRecord.status === "Expired") {
+      setRecruiterStatus('Use "Reconfirm Vacancy" to explicitly review and republish an expired listing.');
+      return;
+    }
     var record = collectRecruiterFormData(status, oldRecord);
     var found = false;
     var updated = existing.map(function (listing) {
@@ -2399,11 +2732,15 @@
   }
 
   function transitionRecruiterListing(listingId, nextStatus) {
-    var listings = readRecruiterListings();
+    var listings = getCurrentRecruiterListings();
     if (!listings) return;
     var listing = listings.find(function (item) { return item.id === listingId; });
     if (!listing) return;
     if (nextStatus === "Published") {
+      if (listing.status === "Expired") {
+        setRecruiterStatus("Use Reconfirm Vacancy to explicitly review an expired listing.");
+        return;
+      }
       openRecruiterListingEditor(listingId);
       saveRecruiterListing("Published");
       return;
@@ -2416,11 +2753,33 @@
     var updated = listings.map(function (item) {
       if (item.id !== listingId) return item;
       item.status = nextStatus;
-      item.updatedAt = new Date().toISOString();
+      var at = new Date().toISOString();
+      item.updatedAt = at;
+      addRecruiterActivity(item, nextStatus === "Closed" ? "closed" : "unpublished", at);
       return item;
     });
     if (!writeRecruiterListings(updated)) return;
     setRecruiterStatus('Listing marked ' + nextStatus + ' in this browser.');
+    refreshPublishedJobs();
+  }
+
+  function reconfirmRecruiterListing(listingId) {
+    var listings = getCurrentRecruiterListings();
+    if (!listings) return;
+    var listing = listings.find(function (item) { return item.id === listingId; });
+    if (!listing || (listing.status !== "Published" && listing.status !== "Expired")) return;
+    var expired = listing.status === "Expired";
+    var prompt = expired
+      ? 'Reconfirm that "' + listing.title + '" is still an active vacancy? This will restore it to this browser’s job explorer for another 15-day review window.'
+      : 'Reconfirm that "' + listing.title + '" is still an active vacancy? This records recruiter activity and restarts its 15-day review window.';
+    if (!window.confirm(prompt)) return;
+    var at = new Date().toISOString();
+    listing.status = "Published";
+    listing.publishedAt = listing.publishedAt || at;
+    listing.updatedAt = at;
+    addRecruiterActivity(listing, "reconfirmed", at);
+    if (!writeRecruiterListings(listings)) return;
+    setRecruiterStatus("Vacancy reconfirmed in this browser. It is not verified or shared.");
     refreshPublishedJobs();
   }
 
@@ -2481,7 +2840,20 @@
       renderRecruiterPortal();
       refreshPublishedJobs();
     }
+    if (event.key === COMPANY_PROFILE_KEY) {
+      renderCompanyTrustCenter();
+      refreshPublishedJobs();
+    }
     if (event.key === AUTH_PROFILE_KEY) renderRecruiterApplicants(readRecruiterListings());
+  });
+
+  var companyProfileSave = document.getElementById("company-profile-save");
+  if (companyProfileSave) companyProfileSave.addEventListener("click", function () { saveCompanyProfile(false); });
+  var companyVerificationSubmit = document.getElementById("company-verification-submit");
+  if (companyVerificationSubmit) companyVerificationSubmit.addEventListener("click", function () { saveCompanyProfile(true); });
+  ["company-profile-name", "company-profile-website", "company-profile-domain", "company-profile-links"].forEach(function (id) {
+    var field = document.getElementById(id);
+    if (field) field.addEventListener("input", function () { clearFieldError(id); });
   });
 
   document.addEventListener("click", function (event) {
@@ -2517,6 +2889,11 @@
       transitionRecruiterListing(recruiterStatusButton.dataset.recruiterStatus, recruiterStatusButton.dataset.nextStatus);
       return;
     }
+    var recruiterReconfirmButton = event.target.closest("[data-recruiter-reconfirm]");
+    if (recruiterReconfirmButton) {
+      reconfirmRecruiterListing(recruiterReconfirmButton.dataset.recruiterReconfirm);
+      return;
+    }
     var recruiterApplicationSave = event.target.closest("[data-recruiter-app-save]");
     if (recruiterApplicationSave) {
       saveRecruiterApplicantStatus(recruiterApplicationSave.dataset.recruiterAppSave);
@@ -2526,9 +2903,25 @@
     if (recruiterCandidateDetailsButton) {
       var details = recruiterCandidateDetailsButton.closest(".recruiter-applicant").querySelector(".recruiter-candidate");
       var expanded = recruiterCandidateDetailsButton.getAttribute("aria-expanded") === "true";
+      var applicantId = recruiterCandidateDetailsButton.closest(".recruiter-applicant").querySelector("[data-recruiter-app-save]").dataset.recruiterAppSave;
+      if (!expanded) recordRecruiterApplicationReview(applicantId);
       recruiterCandidateDetailsButton.setAttribute("aria-expanded", String(!expanded));
       recruiterCandidateDetailsButton.textContent = expanded ? "Candidate details" : "Hide candidate details";
       if (details) details.hidden = expanded;
+      if (!expanded) {
+        renderRecruiterPortal();
+        var currentCard = Array.prototype.filter.call(document.querySelectorAll(".recruiter-applicant"), function (card) {
+          var save = card.querySelector("[data-recruiter-app-save]");
+          return save && save.dataset.recruiterAppSave === applicantId;
+        })[0];
+        if (currentCard) {
+          var currentButton = currentCard.querySelector("[data-recruiter-candidate-details]");
+          var currentDetails = currentCard.querySelector(".recruiter-candidate");
+          currentButton.setAttribute("aria-expanded", "true");
+          currentButton.textContent = "Hide candidate details";
+          currentDetails.hidden = false;
+        }
+      }
       return;
     }
     var routeButton = event.target.closest("[data-student-route]");
@@ -2668,6 +3061,17 @@
     renderRecruiterPortal();
   }
 
+  window.setInterval(function () {
+    var previous = readRecruiterListings();
+    var current = getCurrentRecruiterListings();
+    if (!current) return;
+    var newlyExpired = previous && current.some(function (listing) {
+      return listing.status === "Expired" && previous.some(function (old) { return old.id === listing.id && old.status === "Published"; });
+    });
+    if (newlyExpired) refreshPublishedJobs();
+    else renderRecruiterPortal();
+  }, 60000);
+
   var form = $("#search-form");
   var keywordInput = opt("#search-keyword", "input");
   var locationInput = opt("#search-location", "input");
@@ -2794,7 +3198,9 @@
         '<div class="opp__top">' +
           '<span class="opp__mark" aria-hidden="true">' + escapeHtml(firstChar(o.company)) + "</span>" +
           '<div><div class="opp__company">' + escapeHtml(o.company) + "</div>" + statusBadge(o) +
-            (o.source === "recruiter-local-demo" ? '<span class="badge badge--outline recruiter-local-badge">Local demo</span>' : "") + "</div>" +
+            (o.source === "recruiter-local-demo" ? '<span class="badge badge--outline recruiter-local-badge">Local demo</span>' : "") +
+            '<span class="badge badge--outline trust-badge trust-badge--' + companyTrustClass(o.companyTrustStatus || "Not Submitted") + '">' +
+              escapeHtml(companyTrustLabel(o.companyTrustStatus || "Not Submitted")) + '</span></div>' +
           '<button class="opp__save" type="button" data-save="' + o.id + '" aria-pressed="' + isSaved + '" aria-label="Bookmark: ' + escapeHtml(o.title) + '">' + icon("bookmark") + "</button>" +
         "</div>" +
         '<h3 class="opp__title">' + escapeHtml(o.title) + "</h3>" +
@@ -3079,6 +3485,8 @@
     var note = el("p", "jv__note jv__note--" + (o.status === "DEMO" ? "demo" : o.status === "UNVERIFIED" ? "caution" : "verified"), statusNote(o));
     note.id = "jv-summary";
     view.appendChild(note);
+    var companyTrustPanel = buildCompanyTrustPanel(o);
+    if (companyTrustPanel) view.appendChild(companyTrustPanel);
     if (o.status === "VERIFIED" && o.evidenceUrl) {
       var ev = el("a", "link", "See verification evidence (opens in a new tab)");
       ev.href = o.evidenceUrl; ev.target = "_blank"; ev.rel = "noopener noreferrer";
@@ -3147,6 +3555,51 @@
     var dd = el("dd");
     if (typeof value === "string") dd.textContent = value; else dd.appendChild(value);
     dl.appendChild(dd);
+  }
+
+  function buildCompanyTrustPanel(job) {
+    var isRecruiterListing = job.source === "recruiter-local-demo";
+    var trustStatus = isRecruiterListing ? job.companyTrustStatus : "Not Submitted";
+    var section = el("section", "jv__trust");
+    var heading = el("h3", null, "Company Trust Center");
+    section.appendChild(heading);
+    var badge = el("span", "badge badge--outline trust-badge trust-badge--" + companyTrustClass(trustStatus), companyTrustLabel(trustStatus));
+    section.appendChild(badge);
+    section.appendChild(el("p", "jv__missing", companyTrustExplanation(trustStatus)));
+    var details = el("dl", "jv__summary");
+    summaryRow(details, "Company", job.company);
+    if (isRecruiterListing && job.companyWebsite) {
+      var website = el("a", "link", job.companyWebsite);
+      website.href = job.companyWebsite;
+      website.target = "_blank";
+      website.rel = "noopener noreferrer";
+      summaryRow(details, "Official website provided", website);
+    }
+    if (isRecruiterListing && job.companyEmailDomain) summaryRow(details, "Business email domain provided", job.companyEmailDomain);
+    if (isRecruiterListing && job.companyIndustry) summaryRow(details, "Industry", job.companyIndustry);
+    if (isRecruiterListing && job.companyLocation) summaryRow(details, "Company location", job.companyLocation);
+    if (isRecruiterListing && job.companyDescription) summaryRow(details, "About the company", job.companyDescription);
+    if (isRecruiterListing && job.companyPublicLinks && job.companyPublicLinks.length) {
+      var links = el("div", "trust-links");
+      job.companyPublicLinks.forEach(function (url) {
+        if (!isHttpUrl(url)) return;
+        var link = el("a", "link", new URL(url).hostname);
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        links.appendChild(link);
+      });
+      if (links.childNodes.length) summaryRow(details, "Public links provided", links);
+    }
+    section.appendChild(details);
+    section.appendChild(el("p", "jv__note jv__note--caution", "A company website or email domain is not conclusive proof. Trust status is separate from job publication and recruiter activity."));
+    var report = el("button", "btn btn--text", "Report this job or recruiter");
+    report.type = "button";
+    report.dataset.action = "report-open";
+    report.setAttribute("aria-expanded", "false");
+    report.setAttribute("aria-controls", "jv-report-form");
+    section.appendChild(report);
+    return section;
   }
 
   /* Review step: shown only when a safe official URL exists. It is a confirmation, not a form: it asks for nothing. */
@@ -3284,6 +3737,12 @@
         var applicationJobId = detail.job.id;
         closeDialog();
         openStudentApplicationForm("", applicationJobId, true);
+        break;
+      case "report-open":
+        openJobReportForm(detail.job, btn);
+        break;
+      case "report-submit":
+        saveJobReport(detail.job);
         break;
       case "close": closeDialog(); break;
     }

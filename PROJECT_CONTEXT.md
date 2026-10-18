@@ -9,6 +9,32 @@ Plain HTML + CSS + JavaScript. No npm, no `package.json`, no build step, no fram
 ## Design system
 Forest green + warm ivory. All tokens in `assets/css/tokens.css` (`--color-bg #F7F5EF`, `--color-primary #244B3B`, sage `#D8E2D5`, mint `#E3F1E9`, text `#242824`, muted `#666D66`). Components in `components.css` (`.btn`, `.chip`, `.badge` and status variants `--demo/--unverified/--verified`, `.card`, `.segmented`, `.input/.select`, `.dialog`, `.toast`, `.filter`, `.chip--active`, `.chip--toggle`, `.search__clear`, `.empty`; Step 1.3 appended `.dialog__x`, `.dialog--job`, `.jv__*`). Layout in `home.css`. No blue/neon/gradients/glassmorphism. Reuse tokens; do not add new colours. Focus: global `:focus-visible` 2px primary outline; text fields and filters show the same ring on their wrapper via `:focus-within`.
 
+## Phase 4, Step 4.1 — Company Verification & Trust Center
+
+### Local company profile and request
+- `nexora:demo-company-profile` stores one browser-local company profile, public information, submission timestamp, request status, and optional supporting info. The recruiter portal has a Trust Center form for company name, website, business email domain, description, industry, location, and public links. Company name is required to save; a verification request additionally requires a valid HTTP(S) website and domain.
+- Status is distinct from listing publication and recruiter activity. The application can save `Not Submitted`, `Pending Review`, or a prior `Rejected` record; it does not have an authorized review path and never creates `Verified`. A `Verified` value loaded from local storage is downgraded to `Not Submitted`. Status explanations state that an email domain, URL, or document alone is not proof.
+- Company details are associated with recruiter jobs by case-insensitive exact company-name match. Company profile public fields appear on job details; optional reviewer supporting information remains recruiter-side. Cards/listings/details show company trust separately from the listing's own unverified/demo badge.
+
+### Job reporting and limitations
+- `nexora:demo-job-reports` stores reports with job ID, recruiter listing ID/company ID when available, title/company snapshots, selected reason, optional explanation, timestamp, and Submitted status. Duplicate reports for the same job and reason are blocked. No review/resolution status or reviewer identity is fabricated.
+- Malformed company/report records produce visible errors and are not overwritten. Company/report data remains editable browser-local storage, not tamper-proof or synchronized. No backend reviewer, document upload, email delivery, identity/fraud checks, or cross-device sharing exists.
+- Integrated-browser checks covered profile save/edit, request validation/status persistence, job-card/detail status, reports/duplicates, malformed storage, mobile layout, and regression flows for publishing, saved jobs, application tracker, and 15-day expiry. Static syntax and HTML ID checks passed; Python Playwright suite unavailable because dependency is missing.
+
+## Phase 3, Step 3.4 — Recruiter Accountability & 15-Day Job Activity
+
+### Activity data and policy
+- Recruiter listings continue to use `nexora:demo-recruiter-listings`; no storage key or backend was added. Published listings hold `publishedAt`, `lastRecruiterActivityAt`, and up to 100 `{ type, timestamp, applicationId? }` events.
+- Activity types include publication, reconfirmation, candidate/application review, applicant status changes, closing, unpublishing, and review required. Student edits and passive dashboard/page views do not update recruiter activity.
+- The review deadline is 15 days after the last valid recruiter activity, falling back to the initial publication timestamp. On load and every 60 seconds while the page is open, a published listing at/over the deadline (or with no valid timestamp) becomes `Expired` / **Needs Review**, and is excluded from active Job Explorer results. Review events do not reset the deadline.
+- Recruiters explicitly confirm **Reconfirm Vacancy** to restore an expired listing or restart a Published listing's window. Expired editor Preview/Publish is blocked; Closed records stay closed until an explicit **Reopen & publish** action. Closing and unpublishing write activity events.
+- The dashboard lists last activity and review deadlines/countdowns and counts Needs Review from actual stored records. Activity history is local browser data and is not tamper-proof.
+
+### Demo limitation and validation
+- Local storage cannot enforce deadlines securely on a server, run a scheduled check while the browser is closed, or synchronize users/devices. The interface discloses this. Reliable production enforcement would require shared backend storage and a scheduled server task.
+- Integrated-browser checks covered publication timestamps, 14/15+ day behavior, no passive timer reset, active-results exclusion, confirmation/reconfirmation, audit events, candidate review/status actions, same-status no-op, student/recruiter status separation, student actions not resetting the recruiter timer, invalid dates, refresh persistence, and closed/expired state controls.
+- `node --check assets/js/main.js` and standard-library HTML parsing/duplicate-ID checks passed. The optional Python Playwright suite could not start because the dependency is unavailable.
+
 ## Phase 3, Step 3.3 — Recruiter Applicant Management
 
 ### Storage relationship and limitations

@@ -1,5 +1,44 @@
 # NEXORA — Progress
 
+## Phase 4, Step 4.1 — Company Verification & Trust Center — STATUS: COMPLETE (browser-local demo scope)
+
+### Features implemented
+- Added recruiter Company Profile & Trust Center with editable company name, official website, business email domain, description, industry, location, public links, optional supporting information, and status explanations.
+- Added validation and a local verification-request workflow. Requests remain **Pending Review**; this app has no reviewer and cannot grant **Verified**. A local `Verified` value is downgraded. Resubmitting updates the request timestamp; a Rejected record can be edited and resubmitted.
+- Added separate company trust indicators to opportunity cards, recruiter listings, and job details. Company trust is associated by exact case-insensitive company name and does not alter job publication or Step 3.4 activity status.
+- Added report-job/recruiter form with required reason, optional explanation, local persistence, confirmation, and duplicate job/reason prevention. Reports are not marked reviewed/resolved.
+- Added safe malformed-storage states for company profiles and reports and kept optional reviewer supporting details out of student-facing job details.
+- Documented local-only storage, lack of authorized reviewer/backend, lack of cross-device sync, and need for backend services for actual verification/report review.
+
+### Files changed
+`index.html`, `assets/js/main.js`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated browser — PASS: create/edit profile and persistence; incomplete profile save versus required verification submission; HTTP/HTTPS/domain/public-link validation; Pending Review (never Verified); rejected-status explanation and resubmission; unsafe local Verified value downgraded; job cards/details show matching trust status; report validation, save/confirmation, duplicate handling and refresh persistence; base/recruiter job reporting; malformed data does not overwrite; 390px Trust Center layout/navigation.
+- Regression browser checks — PASS: recruiter draft/edit/publish into Job Explorer, publication state and initial Step 3.4 event persist, company trust stays separate from publication, Saved Jobs bookmark persistence, external Apply Now does not create an application, application status/notes persist, student activity does not reset recruiter timer, and expired listings still transition to Needs Review.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS.
+- `python tests\regression_test.py` — NOT RUN: unavailable because Python Playwright is not installed (`ModuleNotFoundError`).
+
+## Phase 3, Step 3.4 — Recruiter Accountability & 15-Day Job Activity — STATUS: COMPLETE (browser-local demo scope)
+
+### Features implemented
+- Added initial publication timestamps and per-listing activity events for publication, reconfirmation, candidate review, applicant status changes, close/unpublish, and review expiry. The event list is capped at the latest 100 records and applicant events include only the application ID.
+- Published listings expire into **Needs Review** after 15 days without valid recruiter activity (publication time is the fallback); expired listings are excluded from active student opportunities. Invalid/missing activity dates require review safely.
+- Added recruiter-facing last activity, review deadlines/countdowns, review-needed counts and activity history, plus confirmation-gated **Reconfirm Vacancy**.
+- Prevented expired editor Preview/Publish from bypassing reconfirmation. Closed jobs remain closed and expose only the explicit **Reopen & publish** action.
+- Passive page views, reloads, and student actions do not reset recruiter activity. Recruiter review/status actions do; same-status saves do not create audit activity.
+- Kept the policy browser-local and disclosed that it cannot enforce deadlines while closed, securely enforce server-side deadlines, or sync across users/devices.
+
+### Files changed
+`assets/js/main.js`, `index.html`, `assets/css/components.css`, `README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`, `TEST_REPORT.md`.
+
+### Validation status
+- Integrated browser — PASS: publication timestamps/event, 14-day vs. 15+ day fixtures, expiry exclusion from active results, passive reload does not reset the timer, confirmed reconfirmation and audit persistence, invalid timestamp safely expires and records one review event, candidate review/status audit and persistence, same-status no-op, student status remains separate and does not reset recruiter activity, expired editor Preview/Publish guard, closed-state controls, and 390px recruiter mobile navigation/layout without horizontal overflow.
+- `node --check assets/js/main.js` — PASS.
+- Python standard-library HTML parse / duplicate-ID check — PASS.
+- `python tests\regression_test.py` — NOT RUN: could not start because Python Playwright is not installed (`ModuleNotFoundError`).
+
 ## Phase 3, Step 3.3 — Recruiter Applicant Management — STATUS: COMPLETE (single-browser demo scope)
 
 ### Features implemented
